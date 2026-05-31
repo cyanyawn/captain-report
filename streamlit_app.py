@@ -29,11 +29,13 @@ st.markdown("""
         color: #000000 !important;
     }
 
-    /* 强制生成报告按钮居中 */
-    div[data-testid="stButton"] {
-        display: flex;
-        justify-content: center;
-        width: 100%;
+    /* --- 终极居中魔法 --- */
+    /* 强制按钮的最外层容器和内部容器全部居中 */
+    div.element-container:has(div.stButton),
+    div.stButton {
+        display: flex !important;
+        justify-content: center !important;
+        width: 100% !important;
     }
 
     /* 生成报告按钮样式 (浅绿色) */
@@ -46,12 +48,9 @@ st.markdown("""
         width: 200px !important;
         height: 50px !important;
         font-size: 18px !important;
-        
-        /* 最核心的居中代码 */
-        display: block !important; 
-        margin: 10px auto 0 auto !important; 
+        margin: 10px auto 0 auto !important;
+        display: block !important;
     }
-    
     div.stButton > button:hover {
         background-color: #c8e6bb !important;
     }
@@ -96,7 +95,12 @@ st.markdown("<hr>", unsafe_allow_html=True)
 if 'report_text' not in st.session_state:
     st.session_state.report_text = ""
 
-if st.button("生成报告"):
+# 使用 Streamlit 的列布局作为物理居中的双重保险
+col1, col2, col3 = st.columns([1, 2, 1])
+with col2:
+    generate_clicked = st.button("生成报告")
+
+if generate_clicked:
     # --- 处理截止时间格式 ---
     formatted_time = end_time.strip()
     if formatted_time:
@@ -139,7 +143,7 @@ if st.session_state.report_text:
     
     # 注入一段 HTML 和 JavaScript 来实现“浅粉色复制按钮”，并居中
     html_code = f"""
-    <div style="padding: 5px 0; display: flex; justify-content: center;">
+    <div style="padding: 5px 0; display: flex; justify-content: center; width: 100%;">
         <textarea id="hiddenText" style="position:absolute; left:-9999px;">{st.session_state.report_text}</textarea>
         <button onclick="copyToClipboard()" style="background-color: #f8cbcc; color: black; font-weight: bold; border: none; border-radius: 8px; width: 200px; height: 50px; font-size: 18px; cursor: pointer; font-family: sans-serif;">点击复制报告内容</button>
     </div>
