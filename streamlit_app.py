@@ -29,11 +29,17 @@ st.markdown("""
         color: #000000 !important;
     }
 
+    /* 生成报告按钮的容器居中 */
+    div.stButton {
+        display: flex;
+        justify-content: center;
+    }
+
     /* 生成报告按钮样式 (浅绿色) */
     div.stButton > button {
         background-color: #dcf5d0 !important;
         color: #000000 !important;
-        font-weight: bold !important;
+        font-weight: bold !important; /* 文字加粗 */
         border: none !important;
         border-radius: 8px !important;
         width: 200px !important;
@@ -86,6 +92,16 @@ if 'report_text' not in st.session_state:
     st.session_state.report_text = ""
 
 if st.button("生成报告"):
+    # --- 处理截止时间格式 ---
+    formatted_time = end_time.strip()
+    if formatted_time:
+        # 如果用户输入的是纯数字（比如 "12"），自动加上 ":00"
+        if formatted_time.isdigit():
+            formatted_time = f"{formatted_time}:00"
+        # 如果用户不小心输入了中文冒号，自动替换为英文冒号
+        elif "：" in formatted_time:
+            formatted_time = formatted_time.replace("：", ":")
+    
     # 计算总工时和效率
     total_hours = sum([h for h in hourly_hours.values() if h is not None])
     eff = (qty / total_hours) if (qty is not None and total_hours > 0) else 0
@@ -93,10 +109,10 @@ if st.button("生成报告"):
     # 获取今天日期，格式如 05/31
     today = datetime.date.today().strftime("%m/%d")
     
-    # 先组装基础部分
+    # 先组装基础部分 (使用处理过的时间 formatted_time)
     base_report = f"""{today}
 
-截止时间：{end_time}
+截止时间：{formatted_time}
 维修工时：{total_hours:.1f}
 维修效率：{eff:.2f}"""
 
@@ -116,9 +132,9 @@ if st.session_state.report_text:
     
     st.markdown("<hr>", unsafe_allow_html=True)
     
-    # 注入一段 HTML 和 JavaScript 来实现“浅粉色复制按钮”
+    # 注入一段 HTML 和 JavaScript 来实现“浅粉色复制按钮”，并居中
     html_code = f"""
-    <div style="padding: 5px 0;">
+    <div style="padding: 5px 0; display: flex; justify-content: center;">
         <textarea id="hiddenText" style="position:absolute; left:-9999px;">{st.session_state.report_text}</textarea>
         <button onclick="copyToClipboard()" style="background-color: #f8cbcc; color: black; font-weight: bold; border: none; border-radius: 8px; width: 200px; height: 50px; font-size: 18px; cursor: pointer; font-family: sans-serif;">点击复制报告内容</button>
     </div>
