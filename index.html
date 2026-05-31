@@ -56,34 +56,34 @@
             height: 120px;
             resize: none;
         }
-        
-        /* 隐藏 number 输入框右侧的上下小箭头 */
-        input[type=number]::-webkit-inner-spin-button, 
-        input[type=number]::-webkit-outer-spin-button { 
-            -webkit-appearance: none; 
-            margin: 0; 
-        }
 
-        /* --- 核心魔法：微交互状态切换 --- */
+        /* --- 核心魔法：彻底解决红绿冲突 & 状态验证 --- */
         
-        /* 状态 1：点进去但还没输入内容 -> 变红色提醒 */
+        /* 状态 1：默认点击时（空值） -> 红色提醒 */
         input:focus, textarea:focus {
             outline: none;
-            border-color: #FF3B30 !important; /* 苹果经典的警告红 */
-            box-shadow: 0 0 0 1px #FF3B30 !important;
-            background-color: #FFF1F0 !important; /* 极浅的红色背景 */
+            border-color: #FF3B30 !important;
+            box-shadow: 0 0 0 1px #FF3B30 !important; /* 红色光晕 */
+            background-color: #FFF1F0 !important;
         }
 
-        /* 状态 2：填入内容后 -> 变绿色成功状态 (覆盖掉红色) */
-        .is-filled {
+        /* 状态 2：输入正确（数字） -> 纯粹的绿色 */
+        .is-valid {
             border-color: #4CAF50 !important;
-            border-width: 2px !important;
-            background-color: #F4FBF4 !important; /* 极浅的绿色背景 */
+            background-color: #F4FBF4 !important;
+        }
+        /* 覆盖掉选中时的红色光晕，强制变绿 */
+        .is-valid:focus {
+            box-shadow: 0 0 0 1px #4CAF50 !important; 
         }
 
-        /* 状态 3：填入内容且正在选中时 -> 保持绿色的光晕 */
-        .is-filled:focus {
-            box-shadow: 0 0 0 1px #4CAF50 !important;
+        /* 状态 3：输入错误（文本/字母） -> 纯粹的红色 */
+        .is-invalid {
+            border-color: #FF3B30 !important;
+            background-color: #FFF1F0 !important;
+        }
+        .is-invalid:focus {
+            box-shadow: 0 0 0 1px #FF3B30 !important;
         }
 
         /* --- 按钮样式 --- */
@@ -152,11 +152,12 @@
     <h1>维修报告生成工具 V1.0</h1>
     <hr style="margin-top: -5px;">
 
+    <!-- 为了支持正则验证并保留数字键盘，这里使用 type="text" 配合 inputmode="decimal" -->
     <div class="section-title">截止时间</div>
-    <input type="number" id="end_time" class="input-field" placeholder="例如: 22 或者 22:00" enterkeyhint="next">
+    <input type="text" inputmode="decimal" id="end_time" class="input-field" placeholder="例如: 22 或者 22:00" enterkeyhint="next">
 
     <div class="section-title">维修数量</div>
-    <input type="number" id="qty" class="input-field" placeholder="请输入数量" enterkeyhint="next">
+    <input type="text" inputmode="decimal" id="qty" class="input-field" placeholder="请输入数量" enterkeyhint="next">
 
     <div class="section-title">维修工时</div>
     <div id="hours-container">
@@ -191,26 +192,64 @@
     const hoursContainer = document.getElementById('hours-container');
     for (let i = 10; i <= 22; i++) {
         let input = document.createElement('input');
-        input.type = 'number';
+        input.type = 'text';
+        input.inputMode = 'decimal'; // 完美唤起 iOS 带 Next 键的数字符号键盘
         input.id = 'h' + i;
         input.className = 'input-field';
-        input.enterkeyhint = 'next';
+        input.enterKeyHint = 'next';
         input.placeholder = i + ':00';
         input.style.marginBottom = '10px';
         hoursContainer.appendChild(input);
     }
 
-    // 2. 魔法：监听所有输入框，红绿状态切换 + 回车跳跃
+    // 2. 核心魔法：智能验证逻辑
+    function validateInput(input) {
+        let val = input.value.trim();
+        
+        // 如果清空了，恢复默认状态（灰色，点击变红）
+        if (val === '') {
+            input.classList.remove('is-valid', 'is-invalid');
+            return;
+        }
+
+        // 针对“其他分享”：只要有字就是合法的（变绿）
+        if (input.id === 'notes') {
+            input.classList.add('is-valid');
+            input.classList.remove('is-invalid');
+            return;
+        }
+
+        // 针对“截止时间”：只允许数字和冒号
+        if (input.id === 'end_time') {
+            if (/^[\d:：]+$/.test(val)) {
+                input.classList.add('is-valid');
+                input.classList.remove('is-invalid');
+            } else {
+                input.classList.add('is-invalid');
+                input.classList.remove('is-valid');
+            }
+            return;
+        }
+
+        // 针对“数量”和“工时”：只允许纯数字（支持小数点）
+        if (/^\d*\.?\d+$/.test(val)) {
+            input.classList.add('is-valid');
+            input.classList.remove('is-invalid');
+        } else {
+            input.classList.add('is-invalid');
+            input.classList.remove('is-valid');
+        }
+    }
+
+    // 绑定事件
     const allInputs = document.querySelectorAll('.input-field');
     allInputs.forEach((input, index) => {
+        // 每次输入时实时验证
         input.addEventListener('input', function() {
-            if (this.value.trim() !== '') {
-                this.classList.add('is-filled');
-            } else {
-                this.classList.remove('is-filled');
-            }
+            validateInput(this);
         });
 
+        // 回车跳跃逻辑
         input.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
                 if (this.tagName === 'INPUT') {
@@ -238,14 +277,15 @@
 
         let totalHours = 0;
         for (let i = 10; i <= 22; i++) {
-            let val = parseFloat(document.getElementById('h' + i).value);
-            if (!isNaN(val)) {
-                totalHours += val;
+            let valStr = document.getElementById('h' + i).value.trim();
+            // 只有合法的数字才参与计算
+            if (/^\d*\.?\d+$/.test(valStr)) {
+                totalHours += parseFloat(valStr);
             }
         }
         
-        let qty = parseInt(document.getElementById('qty').value, 10);
-        if (isNaN(qty)) qty = 0;
+        let qtyStr = document.getElementById('qty').value.trim();
+        let qty = /^\d*\.?\d+$/.test(qtyStr) ? parseInt(qtyStr, 10) : 0;
         
         let eff = totalHours > 0 ? (qty / totalHours) : 0;
 
@@ -293,7 +333,7 @@
         setTimeout(() => {
             allInputs.forEach(input => {
                 input.value = '';
-                input.classList.remove('is-filled');
+                input.classList.remove('is-valid', 'is-invalid');
             });
             document.getElementById('result-section').style.display = 'none';
         }, 300); 
