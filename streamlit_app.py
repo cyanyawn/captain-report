@@ -13,21 +13,23 @@ for h in range(10, 23):
 if 'notes' not in st.session_state: st.session_state.notes = ""
 if 'report_text' not in st.session_state: st.session_state.report_text = ""
 
-# 2. 强力 CSS：去留白、去提示、主次按钮样式、变绿反馈、隐藏云端水印
+# 2. 强力 CSS：去留白、去提示、主次按钮样式、变绿反馈、隐藏常规水印
 st.markdown("""
     <style>
     /* 去除顶部留白 */
     header {display: none !important;}
     .block-container { padding-top: 1.5rem !important; }
 
-    /* 隐藏右上角菜单和底部水印 */
-    #MainMenu, footer {visibility: hidden;}
-    .stApp {background-color: #FFFFFF;}
+    /* 隐藏右上角菜单、底部水印、以及部署按钮 */
+    #MainMenu, footer {visibility: hidden !important; display: none !important;}
+    .stDeployButton {display: none !important;}
+    [data-testid="stDeployButton"] {display: none !important;}
     
-    /* --- 核心修改：强制隐藏右下角 Streamlit Cloud 的红船和头像 --- */
-    [class^="viewerBadge_"], [class*=" viewerBadge_"] {
-        display: none !important;
-    }
+    /* 尝试用 CSS 隐藏云端徽章 */
+    div[class*="viewerBadge"] {display: none !important;}
+    div[class*="styles_viewerBadge"] {display: none !important;}
+
+    .stApp {background-color: #FFFFFF;}
     
     /* 隐藏数字输入框右侧自带的加减号和回车提示 */
     div[data-testid="stNumberInput"] button { display: none !important; }
@@ -58,8 +60,8 @@ st.markdown("""
         display: block !important;
     }
     button[kind="primary"] p {
-        font-weight: 900 !important; /* 极粗 */
-        font-size: 22px !important; /* 放大字号 */
+        font-weight: 900 !important;
+        font-size: 22px !important;
         margin: 0 !important;
     }
     button[kind="primary"]:hover {
@@ -137,7 +139,6 @@ st.markdown("<hr>", unsafe_allow_html=True)
 # 5. 生成报告逻辑
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
-    # 设置为 primary 主按钮
     generate_clicked = st.button("生成报告", type="primary")
 
 if generate_clicked:
@@ -217,16 +218,41 @@ if st.session_state.report_text:
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
     col_clear1, col_clear2, col_clear3 = st.columns([1, 2, 1])
     with col_clear2:
-        # 点击后直接执行浏览器的强制刷新代码
         if st.button("刷新页面", type="secondary"):
             components.html("<script>window.parent.location.reload();</script>", height=0)
 
-# 7. 注入全局前端魔法脚本 (变绿 + 回车跳跃)
+# 7. 注入全局前端魔法脚本 (变绿 + 回车跳跃 + 强制隐藏右下角徽章)
 magic_js = """
 <script>
 const doc = window.parent.document;
 
+// --- 徽章杀手：暴力隐藏右下角的头像和红船 ---
+function killBadge() {
+    // 1. 通过类名查找并隐藏
+    const badges = doc.querySelectorAll('[class*="viewerBadge"], [class*="styles_viewerBadge"]');
+    badges.forEach(b => {
+        b.style.display = 'none';
+        b.style.opacity = '0';
+        b.style.visibility = 'hidden';
+    });
+    
+    // 2. 暴力查找右下角的悬浮元素 (双重保险)
+    const allDivs = doc.querySelectorAll('div');
+    allDivs.forEach(div => {
+        const style = window.getComputedStyle(div);
+        if (style.position === 'fixed' && style.bottom !== 'auto' && style.right !== 'auto') {
+            // 如果这个悬浮窗里面包含 svg (红船) 或者 img (头像)，直接干掉
+            if (div.innerHTML.includes('svg') || div.innerHTML.includes('img')) {
+                div.style.display = 'none';
+            }
+        }
+    });
+}
+
 function enhanceInputs() {
+    // 每次检查输入框状态时，顺便执行一次徽章杀手
+    killBadge();
+
     const inputs = Array.from(doc.querySelectorAll('input:not([type="hidden"]), textarea'));
     
     inputs.forEach((input, index) => {
@@ -249,7 +275,8 @@ function enhanceInputs() {
     });
 }
 
-// 每半秒检查一次状态
+// 立即执行一次，并每半秒检查一次状态
+killBadge();
 setInterval(enhanceInputs, 500);
 doc.body.addEventListener('input', enhanceInputs);
 
