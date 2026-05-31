@@ -23,7 +23,7 @@ st.markdown("""
         display: none !important; 
     }
     
-    /* --- 核心修改：隐藏 "Press Enter to apply" 提示 --- */
+    /* 隐藏 "Press Enter to apply" 提示 */
     div[data-testid="InputInstructions"] {
         display: none !important;
     }
@@ -49,15 +49,15 @@ st.markdown("""
         border: none !important;
         border-radius: 8px !important;
         width: 200px !important;
-        height: 55px !important; /* 稍微加高一点点以适应大字 */
+        height: 55px !important;
         margin: 10px auto 0 auto !important;
         display: block !important;
     }
     
-    /* --- 核心修改：按钮文字加粗、变大 --- */
+    /* 按钮文字加粗、变大 */
     div.stButton > button p {
         font-weight: 900 !important; /* 极粗 */
-        font-size: 22px !important; /* 放大两个字号 */
+        font-size: 22px !important; /* 放大字号 */
         margin: 0 !important;
     }
 
@@ -90,7 +90,7 @@ qty = st.number_input("维修数量", min_value=0, step=1, value=None, label_vis
 # --- 维修工时 ---
 st.markdown("<div style='font-size: 15px; font-weight: bold; color: #154A7F; margin-top: 25px; margin-bottom: 10px;'>维修工时</div>", unsafe_allow_html=True)
 
-# 循环生成 10 到 22 的输入框 (这些保持黑色正常字体)
+# 循环生成 10 到 22 的输入框
 hourly_hours = {}
 for hour in range(10, 23):
     hourly_hours[hour] = st.number_input(str(hour), min_value=0.0, step=1.0, value=None, key=f"h{hour}")
@@ -111,13 +111,11 @@ with col2:
     generate_clicked = st.button("生成报告")
 
 if generate_clicked:
-    # --- 处理截止时间格式 ---
+    # 处理截止时间格式
     formatted_time = end_time.strip()
     if formatted_time:
-        # 如果用户输入的是纯数字（比如 "12"），自动加上 ":00"
         if formatted_time.isdigit():
             formatted_time = f"{formatted_time}:00"
-        # 如果用户不小心输入了中文冒号，自动替换为英文冒号
         elif "：" in formatted_time:
             formatted_time = formatted_time.replace("：", ":")
     
@@ -125,17 +123,15 @@ if generate_clicked:
     total_hours = sum([h for h in hourly_hours.values() if h is not None])
     eff = (qty / total_hours) if (qty is not None and total_hours > 0) else 0
     
-    # 获取今天日期，格式如 05/31
+    # 获取今天日期
     today = datetime.date.today().strftime("%m/%d")
     
-    # 先组装基础部分 (使用处理过的时间 formatted_time)
     base_report = f"""{today}
 
 截止时间：{formatted_time}
 维修工时：{total_hours:.1f}
 维修效率：{eff:.2f}"""
 
-    # 智能判断：如果 notes 里面有内容（去除空格后不为空），才加上分享部分
     if notes.strip():
         st.session_state.report_text = base_report + f"\n\n分享：\n{notes}"
     else:
@@ -143,18 +139,34 @@ if generate_clicked:
 
 # 6. 显示报告和粉色复制按钮
 if st.session_state.report_text:
-    st.markdown("<hr>", unsafe_allow_html=True)
+    # --- 核心修改：埋入一个不可见的锚点，用于自动滚动定位 ---
+    st.markdown("<div id='report_target'></div>", unsafe_allow_html=True)
     
-    # 将换行符替换为 HTML 的 <br> 以便在网页中正确显示文本
+    # 如果是刚点击生成的，触发自动滚动脚本
+    if generate_clicked:
+        scroll_js = """
+        <script>
+        // 延迟一点点执行，确保页面已经渲染完毕
+        setTimeout(function() {
+            var target = window.parent.document.getElementById('report_target');
+            if (target) {
+                target.scrollIntoView({behavior: 'smooth', block: 'start'});
+            }
+        }, 100);
+        </script>
+        """
+        components.html(scroll_js, height=0)
+
+    # 显示报告文本
     report_display = st.session_state.report_text.replace('\n', '<br>')
     st.markdown(f"<div style='font-size:14px; line-height:1.6; color:#000;'>{report_display}</div>", unsafe_allow_html=True)
     
     st.markdown("<hr>", unsafe_allow_html=True)
     
-    # 注入一段 HTML 和 JavaScript 来实现“浅粉色复制按钮”，并居中
+    # --- 核心修改：加入 readonly 属性，彻底封杀手机键盘弹出的可能 ---
     html_code = f"""
     <div style="padding: 5px 0; display: flex; justify-content: center; width: 100%;">
-        <textarea id="hiddenText" style="position:absolute; left:-9999px;">{st.session_state.report_text}</textarea>
+        <textarea id="hiddenText" readonly style="position:absolute; left:-9999px;">{st.session_state.report_text}</textarea>
         <button onclick="copyToClipboard()" style="background-color: #f8cbcc; color: black; font-weight: bold; border: none; border-radius: 8px; width: 200px; height: 50px; font-size: 18px; cursor: pointer; font-family: sans-serif;">点击复制报告内容</button>
     </div>
     <script>
