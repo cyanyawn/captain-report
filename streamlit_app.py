@@ -5,32 +5,13 @@ import streamlit.components.v1 as components
 # 1. 页面配置
 st.set_page_config(page_title="维修报告生成工具", layout="centered")
 
-# --- 初始化所有的状态变量 (用于清空数据) ---
+# --- 初始化状态变量 ---
 if 'end_time' not in st.session_state: st.session_state.end_time = ""
 if 'qty' not in st.session_state: st.session_state.qty = None
 for h in range(10, 23):
     if f'h{h}' not in st.session_state: st.session_state[f'h{h}'] = None
 if 'notes' not in st.session_state: st.session_state.notes = ""
 if 'report_text' not in st.session_state: st.session_state.report_text = ""
-if 'scroll_to_top' not in st.session_state: st.session_state.scroll_to_top = False
-
-# --- 清空数据的回调函数 ---
-def clear_form():
-    st.session_state.end_time = ""
-    st.session_state.qty = None
-    for h in range(10, 23):
-        st.session_state[f"h{h}"] = None
-    st.session_state.notes = ""
-    st.session_state.report_text = ""
-    st.session_state.scroll_to_top = True # 触发回到顶部
-
-# --- 核心修复：使用图片 onerror 魔法，确保 100% 触发回到顶部 ---
-if st.session_state.scroll_to_top:
-    st.markdown(
-        """<img src="x" onerror="window.parent.scrollTo({top: 0, behavior: 'smooth'});" style="display:none;">""",
-        unsafe_allow_html=True
-    )
-    st.session_state.scroll_to_top = False # 重置状态
 
 # 2. 强力 CSS：去留白、去提示、主次按钮样式、变绿反馈
 st.markdown("""
@@ -80,7 +61,7 @@ st.markdown("""
         background-color: #c8e6bb !important;
     }
 
-    /* --- 次按钮：清空数据 --- */
+    /* --- 次按钮：刷新页面 --- */
     button[kind="secondary"] {
         background-color: #f5f5f5 !important;
         color: #888888 !important;
@@ -125,7 +106,7 @@ st.markdown("""
 st.markdown("<h1>维修报告生成工具 V1.0</h1>", unsafe_allow_html=True)
 st.markdown("<hr style='margin-top: -10px;'>", unsafe_allow_html=True)
 
-# 4. 表单输入区 (绑定了 key 以便清空)
+# 4. 表单输入区
 
 # --- 截止时间 ---
 st.markdown("<div style='font-size: 15px; font-weight: bold; color: #154A7F; margin-bottom: 5px;'>截止时间</div>", unsafe_allow_html=True)
@@ -183,12 +164,12 @@ if generate_clicked:
     else:
         st.session_state.report_text = base_report
 
-# 6. 显示报告、复制按钮 和 清空按钮
+# 6. 显示报告、复制按钮 和 刷新按钮
 if st.session_state.report_text:
     # 埋入一个不可见的锚点，用于自动滚动定位
     st.markdown("<div id='report_target'></div>", unsafe_allow_html=True)
     
-    # --- 核心修复：同样使用 onerror 魔法确保生成后 100% 滑到下方 ---
+    # 生成后自动滑到下方
     if generate_clicked:
         st.markdown(
             """<img src="x" onerror="setTimeout(function(){var t=window.parent.document.getElementById('report_target'); if(t){t.scrollIntoView({behavior: 'smooth', block: 'start'});}}, 100);" style="display:none;">""",
@@ -227,12 +208,13 @@ if st.session_state.report_text:
     """
     components.html(html_code, height=80)
     
-    # --- 清空数据按钮 ---
-    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True) # 稍微加点间距
+    # --- 新增：刷新页面按钮 ---
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
     col_clear1, col_clear2, col_clear3 = st.columns([1, 2, 1])
     with col_clear2:
-        # 设置为 secondary 次按钮，并绑定清空回调函数
-        st.button("清空数据", type="secondary", on_click=clear_form)
+        # 点击后直接执行浏览器的强制刷新代码
+        if st.button("刷新页面", type="secondary"):
+            components.html("<script>window.parent.location.reload();</script>", height=0)
 
 # 7. 注入全局前端魔法脚本 (变绿 + 回车跳跃)
 magic_js = """
