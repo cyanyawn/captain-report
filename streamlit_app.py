@@ -29,10 +29,11 @@ st.markdown("""
         color: #000000 !important;
     }
 
-    /* 生成报告按钮的容器居中 */
-    div.stButton {
+    /* 强制生成报告按钮居中 */
+    div[data-testid="stButton"] {
         display: flex;
         justify-content: center;
+        width: 100%;
     }
 
     /* 生成报告按钮样式 (浅绿色) */
@@ -45,8 +46,12 @@ st.markdown("""
         width: 200px !important;
         height: 50px !important;
         font-size: 18px !important;
-        margin-top: 10px !important;
+        
+        /* 最核心的居中代码 */
+        display: block !important; 
+        margin: 10px auto 0 auto !important; 
     }
+    
     div.stButton > button:hover {
         background-color: #c8e6bb !important;
     }
