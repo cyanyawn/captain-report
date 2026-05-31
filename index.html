@@ -61,6 +61,13 @@
             resize: none;
         }
 
+        /* 隐藏 number 输入框右侧的上下小箭头 */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+
         /* --- 核心魔法：使用全新类名，彻底绕过 Safari 缓存 --- */
         
         /* 状态 1：聚焦但没写字 -> 纯红色提醒 */
@@ -150,11 +157,12 @@
     <h1>维修报告生成工具 V1.0</h1>
     <hr style="margin-top: -5px;">
 
+    <!-- 核心修复：改回 type="number"，完美唤起带有 Next 键的数字符号键盘 -->
     <div class="section-title">截止时间</div>
-    <input type="text" inputmode="decimal" id="end_time" class="input-field" placeholder="例如: 22 或者 22:00" enterkeyhint="next">
+    <input type="number" id="end_time" class="input-field" placeholder="例如: 22 或者 22:00" enterkeyhint="next">
 
     <div class="section-title">维修数量</div>
-    <input type="text" inputmode="decimal" id="qty" class="input-field" placeholder="请输入数量" enterkeyhint="next">
+    <input type="number" id="qty" class="input-field" placeholder="请输入数量" enterkeyhint="next">
 
     <div class="section-title">维修工时</div>
     <div id="hours-container">
@@ -189,8 +197,8 @@
     const hoursContainer = document.getElementById('hours-container');
     for (let i = 10; i <= 22; i++) {
         let input = document.createElement('input');
-        input.type = 'text';
-        input.inputMode = 'decimal';
+        // 核心修复：改回 type="number"，完美唤起带有 Next 键的数字符号键盘
+        input.type = 'number';
         input.id = 'h' + i;
         input.className = 'input-field';
         input.setAttribute('enterkeyhint', 'next');
@@ -265,8 +273,7 @@
                 timeStr += ":00";
             }
             timeStr = timeStr.replace("：", ":");
-            endTimeInput.value = timeStr;
-            checkInputStatus(endTimeInput); // 更新一下状态
+            // 注意：type="number" 的框不能直接赋带冒号的值，所以这里只在生成文本时使用 timeStr
         }
 
         let totalHours = 0;
