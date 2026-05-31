@@ -1,38 +1,54 @@
 import streamlit as st
 import datetime
 
-# 1. 强制移动端友好配置
+# 1. 极致精简配置
 st.set_page_config(page_title="维修助手", layout="centered")
 
-# 核心 CSS：强制输入框不要全屏，且隐藏加减按钮
+# 核心 CSS：强制一行显示，并统一输入框大小
 st.markdown("""
     <style>
+    /* 隐藏顶部菜单、水印 */
     #MainMenu, footer, header {visibility: hidden;}
+    
+    /* 强制：让每一行变成 Flex 布局，时间在左，输入框在右 */
+    div[data-testid="column"] {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    
     /* 隐藏加减按钮 */
     div[data-testid="stNumberInput"] button {display: none;}
-    /* 约束输入框宽度，让它精致一点 */
-    .stNumberInput {max-width: 150px;}
+    
+    /* 统一输入框宽度：包括总维修数量、截止时间、时段工时 */
+    .stNumberInput, .stTextInput {
+        max-width: 120px !important;
+        margin-top: -15px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
 st.title("维修效率助手")
 
-# 2. 顶部基础信息
-quantity = st.number_input("总维修数量", min_value=0, value=0, step=1)
-end_time = st.text_input("当前统计截止时间", value="22:00")
+# 2. 顶部基础信息 (手动控制对齐)
+c_qty1, c_qty2 = st.columns([1, 2])
+with c_qty1: st.write("总维修数量")
+with c_qty2: quantity = st.number_input("qty", value=0, label_visibility="collapsed")
+
+c_time1, c_time2 = st.columns([1, 2])
+with c_time1: st.write("截止时间")
+with c_time2: end_time = st.text_input("time", value="22:00", label_visibility="collapsed")
 
 # 3. 紧凑型格状输入 (10-22点)
+st.write("---")
 st.write("### 各时段工时")
 hourly_hours = {}
 
 for hour in range(10, 23):
-    # 比例固定为 [1, 2]，时间在左，框在右
     col_l, col_r = st.columns([1, 2])
     with col_l:
-        # 使用垂直间距调整，让数字和输入框对齐
-        st.markdown(f"<br> **{hour}**", unsafe_allow_html=True)
+        st.write(f"**{hour}**")
     with col_r:
-        # label_visibility="collapsed" 彻底隐藏标签
         hourly_hours[hour] = st.number_input(
             f"{hour}", 
             min_value=0.0, 
