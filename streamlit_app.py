@@ -5,7 +5,7 @@ import streamlit.components.v1 as components
 # 1. 页面配置
 st.set_page_config(page_title="维修报告生成工具", layout="centered")
 
-# 2. 强力 CSS：去留白、全宽输入框、终极居中
+# 2. 强力 CSS：去留白、去提示、大字号按钮
 st.markdown("""
     <style>
     /* --- 核心修改：去除顶部留白 --- */
@@ -23,13 +23,18 @@ st.markdown("""
         display: none !important; 
     }
     
+    /* --- 核心修改：隐藏 "Press Enter to apply" 提示 --- */
+    div[data-testid="InputInstructions"] {
+        display: none !important;
+    }
+    
     /* 调整默认标签(如10, 11等)的字体颜色和大小，保持黑色不加粗 */
     label[data-testid="stWidgetLabel"] div {
         font-size: 15px !important;
         color: #000000 !important;
     }
 
-    /* --- 终极居中魔法 (恢复上一版的强力居中) --- */
+    /* 强制生成报告按钮的外层容器居中 */
     div.element-container:has(div.stButton),
     div.stButton {
         display: flex !important;
@@ -37,19 +42,25 @@ st.markdown("""
         width: 100% !important;
     }
 
-    /* 生成报告按钮样式 (浅绿色) */
+    /* 生成报告按钮外框样式 (浅绿色) */
     div.stButton > button {
         background-color: #dcf5d0 !important;
         color: #000000 !important;
-        font-weight: bold !important; /* 文字加粗 */
         border: none !important;
         border-radius: 8px !important;
         width: 200px !important;
-        height: 50px !important;
-        font-size: 18px !important;
+        height: 55px !important; /* 稍微加高一点点以适应大字 */
         margin: 10px auto 0 auto !important;
         display: block !important;
     }
+    
+    /* --- 核心修改：按钮文字加粗、变大 --- */
+    div.stButton > button p {
+        font-weight: 900 !important; /* 极粗 */
+        font-size: 22px !important; /* 放大两个字号 */
+        margin: 0 !important;
+    }
+
     div.stButton > button:hover {
         background-color: #c8e6bb !important;
     }
@@ -94,7 +105,7 @@ st.markdown("<hr>", unsafe_allow_html=True)
 if 'report_text' not in st.session_state:
     st.session_state.report_text = ""
 
-# 恢复上一版的物理居中布局！
+# 物理居中布局
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
     generate_clicked = st.button("生成报告")
