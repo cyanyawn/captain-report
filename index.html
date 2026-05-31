@@ -142,13 +142,12 @@
     <h1>维修报告生成工具 V1.0</h1>
     <hr style="margin-top: -5px;">
 
-    <!-- 截止时间保持文本框，方便输入冒号 -->
+    <!-- 核心修改：截止时间改为 type="number"，并加入 placeholder 灰色提示 -->
     <div class="section-title">截止时间</div>
-    <input type="text" id="end_time" class="input-field" enterkeyhint="next">
+    <input type="number" id="end_time" class="input-field" placeholder="例如: 22 或者 22:00" enterkeyhint="next">
 
-    <!-- 核心修改：使用 type="number" 但不加 inputmode，完美唤起 iOS 的“数字与符号键盘”(带Next键) -->
     <div class="section-title">维修数量</div>
-    <input type="number" id="qty" class="input-field" enterkeyhint="next">
+    <input type="number" id="qty" class="input-field" placeholder="请输入数量" enterkeyhint="next">
 
     <div class="section-title">维修工时</div>
     <div id="hours-container">
@@ -156,7 +155,7 @@
     </div>
 
     <div class="section-title">其他分享</div>
-    <textarea id="notes" class="input-field"></textarea>
+    <textarea id="notes" class="input-field" placeholder="有什么想分享的吗？"></textarea>
 
     <!-- 生成按钮 -->
     <div class="btn-container">
@@ -183,7 +182,6 @@
     const hoursContainer = document.getElementById('hours-container');
     for (let i = 10; i <= 22; i++) {
         let input = document.createElement('input');
-        // 核心修改：使用 type="number"，完美唤起带 Next 键的数字符号键盘
         input.type = 'number';
         input.id = 'h' + i;
         input.className = 'input-field';
@@ -223,12 +221,13 @@
         let endTimeInput = document.getElementById('end_time');
         let timeStr = endTimeInput.value.trim();
         if (timeStr) {
+            // 自动补全 :00 的逻辑依然保留，只输入 22 也会变成 22:00
             if (/^\d+$/.test(timeStr)) {
                 timeStr += ":00";
             }
             timeStr = timeStr.replace("：", ":");
-            endTimeInput.value = timeStr; 
-            endTimeInput.classList.add('is-filled');
+            // 注意：因为 type="number" 的输入框不能直接赋值带冒号的字符串
+            // 所以我们只在最终生成的报告里使用格式化后的 timeStr，不强行改变输入框里的值
         }
 
         let totalHours = 0;
