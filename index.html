@@ -68,22 +68,22 @@
         }
 
         /* 状态 2：输入正确（数字） -> 纯粹的绿色 */
-        .is-valid {
+        /* 这里的选择器加上了 :focus，确保优先级压过上面的红色提醒 */
+        input.is-valid, textarea.is-valid,
+        input.is-valid:focus, textarea.is-valid:focus {
+            outline: none !important;
             border-color: #4CAF50 !important;
-            background-color: #F4FBF4 !important;
-        }
-        /* 覆盖掉选中时的红色光晕，强制变绿 */
-        .is-valid:focus {
-            box-shadow: 0 0 0 1px #4CAF50 !important; 
+            box-shadow: 0 0 0 1px #4CAF50 !important; /* 强制绿色光晕 */
+            background-color: #F4FBF4 !important; /* 强制绿色背景 */
         }
 
         /* 状态 3：输入错误（文本/字母） -> 纯粹的红色 */
-        .is-invalid {
+        input.is-invalid, textarea.is-invalid,
+        input.is-invalid:focus, textarea.is-invalid:focus {
+            outline: none !important;
             border-color: #FF3B30 !important;
-            background-color: #FFF1F0 !important;
-        }
-        .is-invalid:focus {
-            box-shadow: 0 0 0 1px #FF3B30 !important;
+            box-shadow: 0 0 0 1px #FF3B30 !important; /* 强制红色光晕 */
+            background-color: #FFF1F0 !important; /* 强制红色背景 */
         }
 
         /* --- 按钮样式 --- */
