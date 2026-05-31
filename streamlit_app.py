@@ -5,18 +5,21 @@ import streamlit.components.v1 as components
 # 1. 页面配置
 st.set_page_config(page_title="维修报告生成工具", layout="centered")
 
-# 2. 强力 CSS：精确还原效果图的样式
+# 2. 强力 CSS：去留白、统一宽度、完美居中
 st.markdown("""
     <style>
-    /* 隐藏多余 UI (右上角菜单和底部水印) */
-    #MainMenu, footer, header {visibility: hidden;}
-    .stApp {background-color: #FFFFFF;}
+    /* --- 核心修改：去除顶部留白 --- */
+    /* 彻底移除顶部 header 占用的物理空间，而不仅仅是隐藏它 */
+    header {display: none !important;}
     
-    /* 限制单行输入框和数字输入框的宽度，完美匹配效果图的短框 */
-    div[data-testid="stTextInput"], 
-    div[data-testid="stNumberInput"] {
-        max-width: 220px !important;
+    /* 强制减少页面主容器的顶部内边距 (默认是 6rem 左右，现在改成 1.5rem) */
+    .block-container {
+        padding-top: 1.5rem !important;
     }
+
+    /* 隐藏右上角菜单和底部水印 */
+    #MainMenu, footer {visibility: hidden;}
+    .stApp {background-color: #FFFFFF;}
     
     /* 隐藏数字输入框右侧自带的加减号 */
     div[data-testid="stNumberInput"] button { 
@@ -29,10 +32,8 @@ st.markdown("""
         color: #000000 !important;
     }
 
-    /* --- 终极居中魔法 --- */
-    /* 强制按钮的最外层容器和内部容器全部居中 */
-    div.element-container:has(div.stButton),
-    div.stButton {
+    /* 强制生成报告按钮的外层容器居中 */
+    div[data-testid="stButton"] {
         display: flex !important;
         justify-content: center !important;
         width: 100% !important;
@@ -48,8 +49,7 @@ st.markdown("""
         width: 200px !important;
         height: 50px !important;
         font-size: 18px !important;
-        margin: 10px auto 0 auto !important;
-        display: block !important;
+        margin-top: 10px !important;
     }
     div.stButton > button:hover {
         background-color: #c8e6bb !important;
@@ -95,12 +95,8 @@ st.markdown("<hr>", unsafe_allow_html=True)
 if 'report_text' not in st.session_state:
     st.session_state.report_text = ""
 
-# 使用 Streamlit 的列布局作为物理居中的双重保险
-col1, col2, col3 = st.columns([1, 2, 1])
-with col2:
-    generate_clicked = st.button("生成报告")
-
-if generate_clicked:
+# 按钮现在通过 CSS 完美居中
+if st.button("生成报告"):
     # --- 处理截止时间格式 ---
     formatted_time = end_time.strip()
     if formatted_time:
