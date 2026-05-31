@@ -13,7 +13,7 @@ for h in range(10, 23):
 if 'notes' not in st.session_state: st.session_state.notes = ""
 if 'report_text' not in st.session_state: st.session_state.report_text = ""
 
-# 2. 强力 CSS：去留白、去提示、主次按钮样式、变绿反馈
+# 2. 强力 CSS：去留白、去提示、主次按钮样式、变绿反馈、隐藏云端水印
 st.markdown("""
     <style>
     /* 去除顶部留白 */
@@ -23,6 +23,11 @@ st.markdown("""
     /* 隐藏右上角菜单和底部水印 */
     #MainMenu, footer {visibility: hidden;}
     .stApp {background-color: #FFFFFF;}
+    
+    /* --- 核心修改：强制隐藏右下角 Streamlit Cloud 的红船和头像 --- */
+    [class^="viewerBadge_"], [class*=" viewerBadge_"] {
+        display: none !important;
+    }
     
     /* 隐藏数字输入框右侧自带的加减号和回车提示 */
     div[data-testid="stNumberInput"] button { display: none !important; }
@@ -208,7 +213,7 @@ if st.session_state.report_text:
     """
     components.html(html_code, height=80)
     
-    # --- 新增：刷新页面按钮 ---
+    # --- 刷新页面按钮 ---
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
     col_clear1, col_clear2, col_clear3 = st.columns([1, 2, 1])
     with col_clear2:
