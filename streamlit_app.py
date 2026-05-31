@@ -24,16 +24,12 @@ def clear_form():
     st.session_state.report_text = ""
     st.session_state.scroll_to_top = True # 触发回到顶部
 
-# 如果刚刚点击了清空，执行回到顶部的动画
+# --- 核心修复：使用图片 onerror 魔法，确保 100% 触发回到顶部 ---
 if st.session_state.scroll_to_top:
-    scroll_top_js = """
-    <script>
-    setTimeout(function() {
-        window.parent.scrollTo({top: 0, behavior: 'smooth'});
-    }, 100);
-    </script>
-    """
-    components.html(scroll_top_js, height=0)
+    st.markdown(
+        """<img src="x" onerror="window.parent.scrollTo({top: 0, behavior: 'smooth'});" style="display:none;">""",
+        unsafe_allow_html=True
+    )
     st.session_state.scroll_to_top = False # 重置状态
 
 # 2. 强力 CSS：去留白、去提示、主次按钮样式、变绿反馈
@@ -192,18 +188,12 @@ if st.session_state.report_text:
     # 埋入一个不可见的锚点，用于自动滚动定位
     st.markdown("<div id='report_target'></div>", unsafe_allow_html=True)
     
+    # --- 核心修复：同样使用 onerror 魔法确保生成后 100% 滑到下方 ---
     if generate_clicked:
-        scroll_down_js = """
-        <script>
-        setTimeout(function() {
-            var target = window.parent.document.getElementById('report_target');
-            if (target) {
-                target.scrollIntoView({behavior: 'smooth', block: 'start'});
-            }
-        }, 100);
-        </script>
-        """
-        components.html(scroll_down_js, height=0)
+        st.markdown(
+            """<img src="x" onerror="setTimeout(function(){var t=window.parent.document.getElementById('report_target'); if(t){t.scrollIntoView({behavior: 'smooth', block: 'start'});}}, 100);" style="display:none;">""",
+            unsafe_allow_html=True
+        )
 
     # 显示报告文本
     report_display = st.session_state.report_text.replace('\n', '<br>')
@@ -237,7 +227,7 @@ if st.session_state.report_text:
     """
     components.html(html_code, height=80)
     
-    # --- 新增：清空数据按钮 ---
+    # --- 清空数据按钮 ---
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True) # 稍微加点间距
     col_clear1, col_clear2, col_clear3 = st.columns([1, 2, 1])
     with col_clear2:
