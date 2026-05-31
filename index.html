@@ -63,12 +63,6 @@
             border-color: #4CAF50;
             box-shadow: 0 0 0 1px #4CAF50;
         }
-        /* 隐藏数字输入框的上下箭头 */
-        input[type=number]::-webkit-inner-spin-button, 
-        input[type=number]::-webkit-outer-spin-button { 
-            -webkit-appearance: none; 
-            margin: 0; 
-        }
 
         /* --- 魔法：填入内容后的绿色状态 --- */
         .is-filled {
@@ -149,7 +143,8 @@
     <input type="text" id="end_time" class="input-field" enterkeyhint="next">
 
     <div class="section-title">维修数量</div>
-    <input type="number" id="qty" class="input-field" inputmode="numeric" enterkeyhint="next">
+    <!-- 核心修改：把 type 改回 text，这样就能调出带“下一项”的全键盘 -->
+    <input type="text" id="qty" class="input-field" enterkeyhint="next">
 
     <div class="section-title">维修工时</div>
     <div id="hours-container">
@@ -187,10 +182,10 @@
     const hoursContainer = document.getElementById('hours-container');
     for (let i = 10; i <= 22; i++) {
         let input = document.createElement('input');
-        input.type = 'number';
+        // 核心修改：把 type 改回 text，确保所有框都有“下一项”按钮
+        input.type = 'text';
         input.id = 'h' + i;
         input.className = 'input-field';
-        input.inputmode = 'decimal'; // 调出带小数点的数字键盘
         input.enterkeyhint = 'next';
         input.placeholder = i + ':00';
         input.style.marginBottom = '10px';
