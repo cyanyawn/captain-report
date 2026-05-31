@@ -40,50 +40,48 @@
             margin-top: 20px;
             margin-bottom: 8px;
         }
+        
+        /* 基础输入框：没有任何发光和多余颜色 */
         input, textarea {
             width: 100%;
             box-sizing: border-box;
             font-size: 16px; 
             padding: 12px;
-            border: 1px solid #cccccc;
+            border: 1px solid #cccccc !important;
             border-radius: 8px;
-            background-color: #ffffff;
+            background-color: #ffffff !important;
+            box-shadow: none !important;
             appearance: none; 
             -webkit-appearance: none;
             transition: all 0.2s ease;
+            outline: none !important;
         }
         textarea {
             height: 120px;
             resize: none;
         }
 
-        /* --- 核心魔法：彻底解决红绿冲突 & 状态验证 --- */
+        /* --- 核心魔法：使用全新类名，彻底绕过 Safari 缓存 --- */
         
-        /* 状态 1：默认点击时（空值） -> 红色提醒 */
-        input:focus, textarea:focus {
-            outline: none;
-            border-color: #FF3B30 !important;
-            box-shadow: 0 0 0 1px #FF3B30 !important; /* 红色光晕 */
+        /* 状态 1：聚焦但没写字 -> 纯红色提醒 */
+        .status-focus {
+            border: 1px solid #FF3B30 !important;
+            box-shadow: 0 0 0 1px #FF3B30 !important;
             background-color: #FFF1F0 !important;
         }
 
-        /* 状态 2：输入正确（数字） -> 纯粹的绿色 */
-        /* 这里的选择器加上了 :focus，确保优先级压过上面的红色提醒 */
-        input.is-valid, textarea.is-valid,
-        input.is-valid:focus, textarea.is-valid:focus {
-            outline: none !important;
-            border-color: #4CAF50 !important;
-            box-shadow: 0 0 0 1px #4CAF50 !important; /* 强制绿色光晕 */
-            background-color: #F4FBF4 !important; /* 强制绿色背景 */
+        /* 状态 2：输入合法内容 -> 纯绿色成功 */
+        .status-valid {
+            border: 1px solid #4CAF50 !important;
+            box-shadow: 0 0 0 1px #4CAF50 !important;
+            background-color: #F4FBF4 !important;
         }
 
-        /* 状态 3：输入错误（文本/字母） -> 纯粹的红色 */
-        input.is-invalid, textarea.is-invalid,
-        input.is-invalid:focus, textarea.is-invalid:focus {
-            outline: none !important;
-            border-color: #FF3B30 !important;
-            box-shadow: 0 0 0 1px #FF3B30 !important; /* 强制红色光晕 */
-            background-color: #FFF1F0 !important; /* 强制红色背景 */
+        /* 状态 3：输入非法内容（如字母） -> 纯红色警告 */
+        .status-error {
+            border: 1px solid #FF3B30 !important;
+            box-shadow: 0 0 0 1px #FF3B30 !important;
+            background-color: #FFF1F0 !important;
         }
 
         /* --- 按钮样式 --- */
@@ -152,7 +150,6 @@
     <h1>维修报告生成工具 V1.0</h1>
     <hr style="margin-top: -5px;">
 
-    <!-- 为了支持正则验证并保留数字键盘，这里使用 type="text" 配合 inputmode="decimal" -->
     <div class="section-title">截止时间</div>
     <input type="text" inputmode="decimal" id="end_time" class="input-field" placeholder="例如: 22 或者 22:00" enterkeyhint="next">
 
@@ -193,61 +190,56 @@
     for (let i = 10; i <= 22; i++) {
         let input = document.createElement('input');
         input.type = 'text';
-        input.inputMode = 'decimal'; // 完美唤起 iOS 带 Next 键的数字符号键盘
+        input.inputMode = 'decimal';
         input.id = 'h' + i;
         input.className = 'input-field';
-        input.enterKeyHint = 'next';
+        input.setAttribute('enterkeyhint', 'next');
         input.placeholder = i + ':00';
         input.style.marginBottom = '10px';
         hoursContainer.appendChild(input);
     }
 
-    // 2. 核心魔法：智能验证逻辑
-    function validateInput(input) {
-        let val = input.value.trim();
+    // 2. 核心魔法：智能验证状态逻辑
+    function checkInputStatus(el) {
+        let val = el.value.trim();
         
-        // 如果清空了，恢复默认状态（灰色，点击变红）
+        // 先移除所有状态
+        el.classList.remove('status-focus', 'status-valid', 'status-error');
+
+        // 如果是空的
         if (val === '') {
-            input.classList.remove('is-valid', 'is-invalid');
-            return;
-        }
-
-        // 针对“其他分享”：只要有字就是合法的（变绿）
-        if (input.id === 'notes') {
-            input.classList.add('is-valid');
-            input.classList.remove('is-invalid');
-            return;
-        }
-
-        // 针对“截止时间”：只允许数字和冒号
-        if (input.id === 'end_time') {
-            if (/^[\d:：]+$/.test(val)) {
-                input.classList.add('is-valid');
-                input.classList.remove('is-invalid');
-            } else {
-                input.classList.add('is-invalid');
-                input.classList.remove('is-valid');
+            // 如果当前光标在里面，显示红色提醒
+            if (document.activeElement === el) {
+                el.classList.add('status-focus');
             }
             return;
         }
 
-        // 针对“数量”和“工时”：只允许纯数字（支持小数点）
-        if (/^\d*\.?\d+$/.test(val)) {
-            input.classList.add('is-valid');
-            input.classList.remove('is-invalid');
+        // 验证逻辑
+        let isValid = false;
+        if (el.id === 'notes') {
+            isValid = true; // 文本框输入任何内容都合法
+        } else if (el.id === 'end_time') {
+            isValid = /^[\d:：]+$/.test(val); // 时间只允许数字和冒号
         } else {
-            input.classList.add('is-invalid');
-            input.classList.remove('is-valid');
+            isValid = /^\d*\.?\d+$/.test(val); // 数量和工时只允许纯数字
+        }
+
+        // 根据验证结果上色
+        if (isValid) {
+            el.classList.add('status-valid');
+        } else {
+            el.classList.add('status-error');
         }
     }
 
     // 绑定事件
     const allInputs = document.querySelectorAll('.input-field');
     allInputs.forEach((input, index) => {
-        // 每次输入时实时验证
-        input.addEventListener('input', function() {
-            validateInput(this);
-        });
+        // 实时输入、获取焦点、失去焦点时，都重新计算状态
+        input.addEventListener('input', () => checkInputStatus(input));
+        input.addEventListener('focus', () => checkInputStatus(input));
+        input.addEventListener('blur', () => checkInputStatus(input));
 
         // 回车跳跃逻辑
         input.addEventListener('keydown', function(e) {
@@ -273,12 +265,13 @@
                 timeStr += ":00";
             }
             timeStr = timeStr.replace("：", ":");
+            endTimeInput.value = timeStr;
+            checkInputStatus(endTimeInput); // 更新一下状态
         }
 
         let totalHours = 0;
         for (let i = 10; i <= 22; i++) {
             let valStr = document.getElementById('h' + i).value.trim();
-            // 只有合法的数字才参与计算
             if (/^\d*\.?\d+$/.test(valStr)) {
                 totalHours += parseFloat(valStr);
             }
@@ -333,7 +326,7 @@
         setTimeout(() => {
             allInputs.forEach(input => {
                 input.value = '';
-                input.classList.remove('is-valid', 'is-invalid');
+                checkInputStatus(input); // 触发状态重置
             });
             document.getElementById('result-section').style.display = 'none';
         }, 300); 
