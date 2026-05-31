@@ -5,7 +5,7 @@ import streamlit.components.v1 as components
 # 1. 页面配置
 st.set_page_config(page_title="维修报告生成工具", layout="centered")
 
-# 2. 强力 CSS：去留白、去提示、大字号按钮
+# 2. 强力 CSS：去留白、去提示、大字号按钮、变绿反馈
 st.markdown("""
     <style>
     /* --- 核心修改：去除顶部留白 --- */
@@ -63,6 +63,19 @@ st.markdown("""
 
     div.stButton > button:hover {
         background-color: #c8e6bb !important;
+    }
+    
+    /* --- 核心修改：填入内容后的绿色边框效果 --- */
+    div[data-baseweb="input"].is-filled,
+    div[data-baseweb="textarea"].is-filled {
+        border-color: #4CAF50 !important; /* 绿色边框 */
+        border-width: 2px !important;
+        background-color: #F4FBF4 !important; /* 极浅的绿色背景 */
+    }
+    /* 保持选中时的光晕也是绿色 */
+    div[data-baseweb="input"].is-filled:focus-within,
+    div[data-baseweb="textarea"].is-filled:focus-within {
+        box-shadow: 0 0 0 1px #4CAF50 !important;
     }
     
     /* 自定义分割线样式 */
@@ -139,14 +152,13 @@ if generate_clicked:
 
 # 6. 显示报告和粉色复制按钮
 if st.session_state.report_text:
-    # --- 核心修改：埋入一个不可见的锚点，用于自动滚动定位 ---
+    # 埋入一个不可见的锚点，用于自动滚动定位
     st.markdown("<div id='report_target'></div>", unsafe_allow_html=True)
     
     # 如果是刚点击生成的，触发自动滚动脚本
     if generate_clicked:
         scroll_js = """
         <script>
-        // 延迟一点点执行，确保页面已经渲染完毕
         setTimeout(function() {
             var target = window.parent.document.getElementById('report_target');
             if (target) {
@@ -163,7 +175,7 @@ if st.session_state.report_text:
     
     st.markdown("<hr>", unsafe_allow_html=True)
     
-    # --- 核心修改：加入 readonly 属性，彻底封杀手机键盘弹出的可能 ---
+    # 注入 HTML 复制按钮 (带 readonly 防键盘弹出)
     html_code = f"""
     <div style="padding: 5px 0; display: flex; justify-content: center; width: 100%;">
         <textarea id="hiddenText" readonly style="position:absolute; left:-9999px;">{st.session_state.report_text}</textarea>
@@ -173,19 +185,74 @@ if st.session_state.report_text:
     function copyToClipboard() {{
         var copyText = document.getElementById("hiddenText");
         copyText.select();
-        copyText.setSelectionRange(0, 99999); // 兼容手机端
+        copyText.setSelectionRange(0, 99999); 
         document.execCommand("copy");
         
-        // 复制成功后的按钮反馈效果
         var btn = document.querySelector("button");
         var originalText = btn.innerText;
         btn.innerText = "复制成功！";
-        btn.style.backgroundColor = "#dcf5d0"; // 成功后短暂变成浅绿色
+        btn.style.backgroundColor = "#dcf5d0"; 
         setTimeout(function(){{ 
             btn.innerText = originalText; 
-            btn.style.backgroundColor = "#f8cbcc"; // 恢复粉色
+            btn.style.backgroundColor = "#f8cbcc"; 
         }}, 2000);
     }}
     </script>
     """
     components.html(html_code, height=80)
+
+# 7. 注入全局前端魔法脚本 (变绿 + 回车跳跃)
+magic_js = """
+<script>
+const doc = window.parent.document;
+
+function enhanceInputs() {
+    // 获取所有的输入框
+    const inputs = Array.from(doc.querySelectorAll('input:not([type="hidden"]), textarea'));
+    
+    inputs.forEach((input, index) => {
+        // 1. 改变 iOS 键盘的 "换行" 按钮为 "下一项" (Next)
+        if (index < inputs.length - 1) {
+            input.setAttribute('enterkeyhint', 'next');
+        } else {
+            input.setAttribute('enterkeyhint', 'done');
+        }
+
+        // 2. 检查是否有值，如果有值就加上 'is-filled' 的 CSS 类让它变绿
+        const wrapper = input.closest('div[data-baseweb="input"]') || input.closest('div[data-baseweb="textarea"]');
+        if (wrapper) {
+            if (input.value && input.value.trim() !== '') {
+                wrapper.classList.add('is-filled');
+            } else {
+                wrapper.classList.remove('is-filled');
+            }
+        }
+    });
+}
+
+// 每半秒检查一次，防止 Streamlit 刷新导致状态丢失
+setInterval(enhanceInputs, 500);
+doc.body.addEventListener('input', enhanceInputs);
+
+// 3. 监听回车键 (Enter)
+doc.body.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        // 只有在普通的单行输入框里按回车，才会跳到下一个框
+        // (Textarea 大框保留正常的回车换行功能)
+        if (e.target.tagName === 'INPUT') {
+            e.preventDefault(); // 阻止默认的提交刷新行为
+            const inputs = Array.from(doc.querySelectorAll('input:not([type="hidden"]), textarea'));
+            const currentIndex = inputs.indexOf(e.target);
+            
+            // 聚焦到下一个框
+            if (currentIndex > -1 && currentIndex < inputs.length - 1) {
+                inputs[currentIndex + 1].focus();
+            } else {
+                e.target.blur(); // 如果是最后一个，收起键盘
+            }
+        }
+    }
+}, true);
+</script>
+"""
+components.html(magic_js, height=0)
