@@ -176,6 +176,11 @@
     <div class="btn-container">
         <button class="btn-primary" onclick="generateReport()">生成报告</button>
     </div>
+    
+    <!-- 新增：首页的刷新页面按钮 -->
+    <div class="btn-container" style="margin-top: 15px;">
+        <button class="btn-secondary" onclick="clearData()">刷新页面</button>
+    </div>
 
     <!-- 结果区 -->
     <div id="result-section">
@@ -197,7 +202,6 @@
     const hoursContainer = document.getElementById('hours-container');
     for (let i = 10; i <= 22; i++) {
         let input = document.createElement('input');
-        // 核心修复：改回 type="number"，完美唤起带有 Next 键的数字符号键盘
         input.type = 'number';
         input.id = 'h' + i;
         input.className = 'input-field';
