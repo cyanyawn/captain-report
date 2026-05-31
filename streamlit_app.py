@@ -1,74 +1,139 @@
 import streamlit as st
 import datetime
+import streamlit.components.v1 as components
 
-# 1. 极致精简配置
-st.set_page_config(page_title="Work Report", layout="centered")
+# 1. 页面配置
+st.set_page_config(page_title="维修报告生成工具", layout="centered")
 
-# 2. 强力 CSS：锁定布局，配色与大小优化
+# 2. 强力 CSS：精确还原效果图的样式
 st.markdown("""
     <style>
-    /* 隐藏所有多余 UI */
+    /* 隐藏多余 UI (右上角菜单和底部水印) */
     #MainMenu, footer, header {visibility: hidden;}
-    
-    /* 全局背景色 */
     .stApp {background-color: #FFFFFF;}
     
-    /* 定义行布局：强制左标签、右输入框 */
-    .row-box {
-        display: flex !important;
-        flex-direction: row !important;
-        align-items: center !important;
-        justify-content: space-between !important;
-        padding: 5px 0 !important;
+    /* 限制单行输入框和数字输入框的宽度，完美匹配效果图的短框 */
+    div[data-testid="stTextInput"], 
+    div[data-testid="stNumberInput"] {
+        max-width: 220px !important;
     }
     
-    /* 标签文字样式 */
-    .label-text { font-size: 14px; color: #333333; font-weight: 500; }
+    /* 隐藏数字输入框右侧自带的加减号 */
+    div[data-testid="stNumberInput"] button { 
+        display: none !important; 
+    }
     
-    /* 输入框样式：强制宽度，隐藏加减号 */
-    .stNumberInput, .stTextInput, .stTextArea { width: 140px !important; }
-    div[data-testid="stNumberInput"] button { display: none !important; }
+    /* 调整所有标签的字体颜色和大小 */
+    label[data-testid="stWidgetLabel"] div {
+        font-size: 15px !important;
+        color: #000000 !important;
+    }
+
+    /* 生成报告按钮样式 (浅绿色) */
+    div.stButton > button {
+        background-color: #dcf5d0 !important;
+        color: #000000 !important;
+        font-weight: bold !important;
+        border: none !important;
+        border-radius: 8px !important;
+        width: 200px !important;
+        height: 50px !important;
+        font-size: 18px !important;
+        margin-top: 10px !important;
+    }
+    div.stButton > button:hover {
+        background-color: #c8e6bb !important;
+    }
+    
+    /* 自定义分割线样式 */
+    hr {
+        border-top: 1px solid #d3d3d3;
+        margin: 25px 0;
+    }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("Work Report V1.0")
+# 3. 标题区
+st.markdown("<h1>维修报告生成工具 V1.0</h1>", unsafe_allow_html=True)
+st.markdown("<hr style='margin-top: -10px;'>", unsafe_allow_html=True)
 
-# 辅助函数：生成一行布局
-def row(label, component):
-    st.markdown(f'<div class="row-box"><div class="label-text">{label}</div><div>', unsafe_allow_html=True)
-    component
-    st.markdown('</div></div>', unsafe_allow_html=True)
+# 4. 表单输入区
+end_time = st.text_input("截止时间", value="")
+qty = st.number_input("维修数量", min_value=0, step=1, value=None)
 
-# 3. 页面内容
-end_time = st.text_input("et", value="22:00", label_visibility="collapsed")
-row("Deadline", end_time)
+# 维修工时标题
+st.markdown("<div style='font-size: 15px; margin-top: 20px; margin-bottom: -15px; color: #000;'>维修工时</div>", unsafe_allow_html=True)
 
-qty = st.number_input("qty", value=0, step=1, label_visibility="collapsed")
-row("Quantity", qty)
-
-st.write("---")
-st.markdown("### Working Hours")
+# 循环生成 10 到 22 的输入框
 hourly_hours = {}
 for hour in range(10, 23):
-    val = st.number_input(f"h{hour}", min_value=0.0, value=None, label_visibility="collapsed")
-    row(f"{hour}:00", val)
-    hourly_hours[hour] = val
+    hourly_hours[hour] = st.number_input(str(hour), min_value=0.0, step=1.0, value=None, key=f"h{hour}")
 
-st.write("---")
-notes = st.text_area("notes", value="", placeholder="Additional info...", label_visibility="collapsed")
-st.markdown("Other Notes")
-st.markdown(f'<div style="margin-top:-10px;">', unsafe_allow_html=True)
-notes
-st.markdown('</div>', unsafe_allow_html=True)
+# 其他分享 (文本域默认就是宽的，不需要限制宽度)
+notes = st.text_area("其他分享", value="", height=150)
 
-# 4. 按钮
-st.write("---")
-if st.button("Generate Report", use_container_width=True):
-    total = sum([h for h in hourly_hours.values() if h is not None])
-    eff = (qty / total) if total > 0 else 0
+st.markdown("<hr>", unsafe_allow_html=True)
+
+# 5. 生成报告逻辑
+# 使用 session_state 保存报告内容，这样点击按钮后内容不会消失
+if 'report_text' not in st.session_state:
+    st.session_state.report_text = ""
+
+if st.button("生成报告"):
+    # 计算总工时和效率
+    total_hours = sum([h for h in hourly_hours.values() if h is not None])
+    eff = (qty / total_hours) if (qty is not None and total_hours > 0) else 0
+    
+    # 获取今天日期，格式如 5/31
     today = datetime.date.today().strftime("%m/%d")
     
-    report = f"{today}\nDeadline: {end_time}\nQuantity: {qty}\nHours: {total:.1f}\nEfficiency: {eff:.2f}\n\nNotes: {notes}"
-    st.success("Report Generated!")
-    st.code(report, language="text")
-    st.info("Long press the text above to copy")
+    # 组装报告文本 (按照你图中的模版)
+    st.session_state.report_text = f"""报告的模版：
+
+{today} (日期)
+
+截止时间：{end_time}
+维修工时：{total_hours:.1f}
+维修效率：{eff:.2f}
+
+分享：
+{notes}"""
+
+# 6. 显示报告和粉色复制按钮
+if st.session_state.report_text:
+    st.markdown("<hr>", unsafe_allow_html=True)
+    
+    # 将换行符替换为 HTML 的 <br> 以便在网页中正确显示文本
+    report_display = st.session_state.report_text.replace('\n', '<br>')
+    st.markdown(f"<div style='font-size:14px; line-height:1.6; color:#000;'>{report_display}</div>", unsafe_allow_html=True)
+    
+    st.markdown("<hr>", unsafe_allow_html=True)
+    
+    # 注入一段 HTML 和 JavaScript 来实现“浅粉色复制按钮”
+    # 因为 Streamlit 原生不支持直接往剪贴板写内容，必须用 JS 实现
+    html_code = f"""
+    <div style="padding: 5px 0;">
+        <textarea id="hiddenText" style="position:absolute; left:-9999px;">{st.session_state.report_text}</textarea>
+        <button onclick="copyToClipboard()" style="background-color: #f8cbcc; color: black; font-weight: bold; border: none; border-radius: 8px; width: 200px; height: 50px; font-size: 18px; cursor: pointer; font-family: sans-serif;">点击复制报告内容</button>
+    </div>
+    <script>
+    function copyToClipboard() {{
+        var copyText = document.getElementById("hiddenText");
+        copyText.select();
+        copyText.setSelectionRange(0, 99999); // 兼容手机端
+        document.execCommand("copy");
+        
+        // 复制成功后的按钮反馈效果
+        var btn = document.querySelector("button");
+        var originalText = btn.innerText;
+        btn.innerText = "复制成功！";
+        btn.style.backgroundColor = "#dcf5d0"; // 成功后短暂变成浅绿色
+        setTimeout(function(){{ 
+            btn.innerText = originalText; 
+            btn.style.backgroundColor = "#f8cbcc"; // 恢复粉色
+        }}, 2000);
+    }}
+    </script>
+    """
+    # 渲染这个自定义的 HTML 复制按钮
+    components.html(html_code, height=80)
