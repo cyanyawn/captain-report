@@ -23,7 +23,7 @@ st.markdown("""
         display: none !important; 
     }
     
-    /* 调整所有标签的字体颜色和大小 */
+    /* 调整默认标签(如10, 11等)的字体颜色和大小，保持黑色不加粗 */
     label[data-testid="stWidgetLabel"] div {
         font-size: 15px !important;
         color: #000000 !important;
@@ -58,24 +58,30 @@ st.markdown("<h1>维修报告生成工具 V1.0</h1>", unsafe_allow_html=True)
 st.markdown("<hr style='margin-top: -10px;'>", unsafe_allow_html=True)
 
 # 4. 表单输入区
-end_time = st.text_input("截止时间", value="")
-qty = st.number_input("维修数量", min_value=0, step=1, value=None)
 
-# 维修工时标题
-st.markdown("<div style='font-size: 15px; margin-top: 20px; margin-bottom: -15px; color: #000;'>维修工时</div>", unsafe_allow_html=True)
+# --- 截止时间 ---
+st.markdown("<div style='font-size: 15px; font-weight: bold; color: #154A7F; margin-bottom: 5px;'>截止时间</div>", unsafe_allow_html=True)
+end_time = st.text_input("截止时间", value="", label_visibility="collapsed")
 
-# 循环生成 10 到 22 的输入框
+# --- 维修数量 ---
+st.markdown("<div style='font-size: 15px; font-weight: bold; color: #154A7F; margin-bottom: 5px; margin-top: 15px;'>维修数量</div>", unsafe_allow_html=True)
+qty = st.number_input("维修数量", min_value=0, step=1, value=None, label_visibility="collapsed")
+
+# --- 维修工时 ---
+st.markdown("<div style='font-size: 15px; font-weight: bold; color: #154A7F; margin-top: 25px; margin-bottom: 10px;'>维修工时</div>", unsafe_allow_html=True)
+
+# 循环生成 10 到 22 的输入框 (这些保持黑色正常字体)
 hourly_hours = {}
 for hour in range(10, 23):
     hourly_hours[hour] = st.number_input(str(hour), min_value=0.0, step=1.0, value=None, key=f"h{hour}")
 
-# 其他分享 (文本域默认就是宽的，不需要限制宽度)
-notes = st.text_area("其他分享", value="", height=150)
+# --- 其他分享 ---
+st.markdown("<div style='font-size: 15px; font-weight: bold; color: #154A7F; margin-bottom: 5px; margin-top: 20px;'>其他分享</div>", unsafe_allow_html=True)
+notes = st.text_area("其他分享", value="", height=150, label_visibility="collapsed")
 
 st.markdown("<hr>", unsafe_allow_html=True)
 
 # 5. 生成报告逻辑
-# 使用 session_state 保存报告内容，这样点击按钮后内容不会消失
 if 'report_text' not in st.session_state:
     st.session_state.report_text = ""
 
@@ -84,20 +90,21 @@ if st.button("生成报告"):
     total_hours = sum([h for h in hourly_hours.values() if h is not None])
     eff = (qty / total_hours) if (qty is not None and total_hours > 0) else 0
     
-    # 获取今天日期，格式如 5/31
+    # 获取今天日期，格式如 05/31
     today = datetime.date.today().strftime("%m/%d")
     
-    # 组装报告文本 (按照你图中的模版)
-    st.session_state.report_text = f"""报告的模版：
-
-{today} (日期)
+    # 先组装基础部分
+    base_report = f"""{today}
 
 截止时间：{end_time}
 维修工时：{total_hours:.1f}
-维修效率：{eff:.2f}
+维修效率：{eff:.2f}"""
 
-分享：
-{notes}"""
+    # 智能判断：如果 notes 里面有内容（去除空格后不为空），才加上分享部分
+    if notes.strip():
+        st.session_state.report_text = base_report + f"\n\n分享：\n{notes}"
+    else:
+        st.session_state.report_text = base_report
 
 # 6. 显示报告和粉色复制按钮
 if st.session_state.report_text:
@@ -110,7 +117,6 @@ if st.session_state.report_text:
     st.markdown("<hr>", unsafe_allow_html=True)
     
     # 注入一段 HTML 和 JavaScript 来实现“浅粉色复制按钮”
-    # 因为 Streamlit 原生不支持直接往剪贴板写内容，必须用 JS 实现
     html_code = f"""
     <div style="padding: 5px 0;">
         <textarea id="hiddenText" style="position:absolute; left:-9999px;">{st.session_state.report_text}</textarea>
@@ -135,5 +141,4 @@ if st.session_state.report_text:
     }}
     </script>
     """
-    # 渲染这个自定义的 HTML 复制按钮
     components.html(html_code, height=80)
