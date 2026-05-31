@@ -2,61 +2,78 @@ import streamlit as st
 import datetime
 
 # 1. 极致精简配置
-st.set_page_config(page_title="维修助手", layout="centered")
+st.set_page_config(page_title="维修报告助手", layout="centered")
 
-# 核心 CSS：强制一行显示，输入框固定大小
+# 2. 精致化 CSS 配色方案
 st.markdown("""
     <style>
-    /* 强制所有容器内的元素水平对齐，不换行 */
-    div[data-testid="column"] { display: flex !important; align-items: center !important; }
+    /* 隐藏多余界面元素 */
+    #MainMenu, footer, header {visibility: hidden;}
     
-    /* 隐藏数字输入框的加减按钮 */
-    div[data-testid="stNumberInput"] button { display: none !important; }
+    /* 页面基础字体与颜色 */
+    .stApp {background-color: #FAFAFA;}
     
-    /* 限制所有输入框的宽度，防止它们抢占全屏 */
-    .stNumberInput, .stTextInput { width: 120px !important; }
+    /* 标题样式 */
+    h1 {font-size: 24px !important; color: #333 !important; margin-bottom: 20px;}
+    h3 {font-size: 18px !important; color: #555 !important; margin-top: 20px;}
     
-    /* 强制垂直间距对齐 */
-    div.stNumberInput { margin-top: -10px !important; }
+    /* 强制 Grid 布局，锁定左列(标签)右列(输入框) */
+    .grid-container {
+        display: grid !important;
+        grid-template-columns: 80px 1fr !important;
+        align-items: center !important;
+        gap: 15px !important;
+        margin-bottom: 8px !important;
+    }
+    
+    /* 标签文字样式 */
+    .label-text {font-size: 14px; color: #666;}
+    
+    /* 输入框样式微调 */
+    .stNumberInput, .stTextInput, .stTextArea {margin-top: -10px !important;}
+    div[data-testid="stNumberInput"] button {display: none;}
     </style>
 """, unsafe_allow_html=True)
 
-st.title("维修效率助手")
+st.title("维修报告生成工具 V1.0")
 
-# 2. 团队录入区域
-# 即使是顶部输入，也手动控制布局，保持和下方表格一致
-col_t1, col_t2 = st.columns([1, 2])
-with col_t1: st.write("维修总数")
-with col_t2: quantity = st.number_input("qty", value=0, label_visibility="collapsed")
+# 3. 布局逻辑
+# 使用 HTML div 包装的 Grid 布局
+def input_row(label, component):
+    st.markdown(f'<div class="grid-container"><div class="label-text">{label}</div><div>', unsafe_allow_html=True)
+    component
+    st.markdown('</div></div>', unsafe_allow_html=True)
 
-col_t3, col_t4 = st.columns([1, 2])
-with col_t3: st.write("截止时间")
-with col_t4: end_time = st.text_input("time", value="22:00", label_visibility="collapsed")
+# 顶部基础信息
+quantity = st.number_input("qty", value=0, label_visibility="collapsed")
+input_row("维修数量", quantity)
 
+end_time = st.text_input("time", value="22:00", label_visibility="collapsed")
+input_row("截止时间", end_time)
+
+# 4. 工时输入 (10-22点)
 st.write("---")
-st.write("### 各时段工时")
-
+st.subheader("维修工时")
 hourly_hours = {}
-
-# 3. 最稳定的行布局：每一行都强制是一个 col_left 和 col_right
 for hour in range(10, 23):
-    c1, c2 = st.columns([1, 2])
-    with c1:
-        st.write(f"**{hour}**")
-    with c2:
-        hourly_hours[hour] = st.number_input(
-            f"h{hour}", min_value=0.0, value=None, label_visibility="collapsed"
-        )
+    hourly_hours[hour] = st.number_input(f"h{hour}", min_value=0.0, value=None, label_visibility="collapsed")
+    input_row(f"{hour}:00", hourly_hours[hour])
 
-# 4. 大按钮，方便团队同事点击
-if st.button("生成统计报告", use_container_width=True):
+# 5. 其他分享
+st.write("---")
+notes = st.text_area("notes", value="", placeholder="备注信息...", label_visibility="collapsed")
+st.write("其他分享")
+st.markdown(f'<div style="margin-top:-10px;">', unsafe_allow_html=True)
+notes
+st.markdown('</div>', unsafe_allow_html=True)
+
+# 6. 生成报告按钮
+if st.button("生成报告", use_container_width=True):
     total_hours = sum([h for h in hourly_hours.values() if h is not None])
-    if total_hours > 0:
-        efficiency = quantity / total_hours
-        today = datetime.date.today().strftime("%m/%d")
-        report = f"{today}\n截止: {end_time}\n数量: {quantity}\n工时: {total_hours:.1f}\n效率: {efficiency:.2f}"
-        st.success("报告已生成！")
-        st.code(report, language="text")
-        st.info("长按上方文本复制发送")
-    else:
-        st.error("请填入至少一个时段的工时")
+    today = datetime.date.today().strftime("%m/%d")
+    
+    report = f"{today}\n截止目前: {end_time}\n维修数量: {quantity}\n维修工时: {total_hours:.1f}\n维修效率: {(quantity/total_hours if total_hours>0 else 0):.2f}\n\n备注: {notes}"
+    
+    st.success("报告已生成！")
+    st.code(report, language="text")
+    st.info("长按上方文本即可复制发送")
