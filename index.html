@@ -56,11 +56,6 @@
             height: 120px;
             resize: none;
         }
-        input:focus, textarea:focus {
-            outline: none;
-            border-color: #4CAF50;
-            box-shadow: 0 0 0 1px #4CAF50;
-        }
         
         /* 隐藏 number 输入框右侧的上下小箭头 */
         input[type=number]::-webkit-inner-spin-button, 
@@ -69,11 +64,26 @@
             margin: 0; 
         }
 
-        /* --- 魔法：填入内容后的绿色状态 --- */
+        /* --- 核心魔法：微交互状态切换 --- */
+        
+        /* 状态 1：点进去但还没输入内容 -> 变红色提醒 */
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #FF3B30 !important; /* 苹果经典的警告红 */
+            box-shadow: 0 0 0 1px #FF3B30 !important;
+            background-color: #FFF1F0 !important; /* 极浅的红色背景 */
+        }
+
+        /* 状态 2：填入内容后 -> 变绿色成功状态 (覆盖掉红色) */
         .is-filled {
             border-color: #4CAF50 !important;
             border-width: 2px !important;
-            background-color: #F4FBF4 !important;
+            background-color: #F4FBF4 !important; /* 极浅的绿色背景 */
+        }
+
+        /* 状态 3：填入内容且正在选中时 -> 保持绿色的光晕 */
+        .is-filled:focus {
+            box-shadow: 0 0 0 1px #4CAF50 !important;
         }
 
         /* --- 按钮样式 --- */
@@ -142,7 +152,6 @@
     <h1>维修报告生成工具 V1.0</h1>
     <hr style="margin-top: -5px;">
 
-    <!-- 核心修改：截止时间改为 type="number"，并加入 placeholder 灰色提示 -->
     <div class="section-title">截止时间</div>
     <input type="number" id="end_time" class="input-field" placeholder="例如: 22 或者 22:00" enterkeyhint="next">
 
@@ -191,7 +200,7 @@
         hoursContainer.appendChild(input);
     }
 
-    // 2. 魔法：监听所有输入框，变绿 + 回车跳跃
+    // 2. 魔法：监听所有输入框，红绿状态切换 + 回车跳跃
     const allInputs = document.querySelectorAll('.input-field');
     allInputs.forEach((input, index) => {
         input.addEventListener('input', function() {
@@ -221,13 +230,10 @@
         let endTimeInput = document.getElementById('end_time');
         let timeStr = endTimeInput.value.trim();
         if (timeStr) {
-            // 自动补全 :00 的逻辑依然保留，只输入 22 也会变成 22:00
             if (/^\d+$/.test(timeStr)) {
                 timeStr += ":00";
             }
             timeStr = timeStr.replace("：", ":");
-            // 注意：因为 type="number" 的输入框不能直接赋值带冒号的字符串
-            // 所以我们只在最终生成的报告里使用格式化后的 timeStr，不强行改变输入框里的值
         }
 
         let totalHours = 0;
