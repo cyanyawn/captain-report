@@ -2,7 +2,6 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <!-- 核心：禁止 iOS 自动缩放，并开启全屏 App 模式 -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -44,13 +43,12 @@
         input, textarea {
             width: 100%;
             box-sizing: border-box;
-            /* 字体必须是 16px，否则 iPhone 点击时会自动放大页面 */
             font-size: 16px; 
             padding: 12px;
             border: 1px solid #cccccc;
             border-radius: 8px;
             background-color: #ffffff;
-            appearance: none; /* 去除 iOS 默认内阴影 */
+            appearance: none; 
             -webkit-appearance: none;
             transition: all 0.2s ease;
         }
@@ -62,6 +60,13 @@
             outline: none;
             border-color: #4CAF50;
             box-shadow: 0 0 0 1px #4CAF50;
+        }
+        
+        /* 隐藏 number 输入框右侧的上下小箭头 */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
         }
 
         /* --- 魔法：填入内容后的绿色状态 --- */
@@ -111,7 +116,7 @@
             border: 1px solid #dddddd;
         }
 
-        /* --- 结果显示区 (默认隐藏) --- */
+        /* --- 结果显示区 --- */
         #result-section {
             display: none;
         }
@@ -124,7 +129,6 @@
             border-radius: 8px;
             border: 1px solid #eeeeee;
         }
-        /* 隐藏用于复制的文本域 */
         #hidden-copy-text {
             position: absolute;
             left: -9999px;
@@ -138,17 +142,17 @@
     <h1>维修报告生成工具 V1.0</h1>
     <hr style="margin-top: -5px;">
 
-    <!-- 表单区 -->
+    <!-- 截止时间保持文本框，方便输入冒号 -->
     <div class="section-title">截止时间</div>
     <input type="text" id="end_time" class="input-field" enterkeyhint="next">
 
+    <!-- 核心修改：使用 type="number" 但不加 inputmode，完美唤起 iOS 的“数字与符号键盘”(带Next键) -->
     <div class="section-title">维修数量</div>
-    <!-- 核心修改：把 type 改回 text，这样就能调出带“下一项”的全键盘 -->
-    <input type="text" id="qty" class="input-field" enterkeyhint="next">
+    <input type="number" id="qty" class="input-field" enterkeyhint="next">
 
     <div class="section-title">维修工时</div>
     <div id="hours-container">
-        <!-- JS 会在这里自动生成 10 到 22 的输入框 -->
+        <!-- JS 自动生成 -->
     </div>
 
     <div class="section-title">其他分享</div>
@@ -164,13 +168,10 @@
         <hr>
         <div id="report-output" class="report-display"></div>
         <hr>
-        
         <textarea id="hidden-copy-text" readonly></textarea>
-        
         <div class="btn-container">
             <button id="copy-btn" class="btn-copy" onclick="copyReport()">点击复制报告内容</button>
         </div>
-        
         <div class="btn-container" style="margin-top: 15px;">
             <button class="btn-secondary" onclick="clearData()">刷新页面</button>
         </div>
@@ -182,8 +183,8 @@
     const hoursContainer = document.getElementById('hours-container');
     for (let i = 10; i <= 22; i++) {
         let input = document.createElement('input');
-        // 核心修改：把 type 改回 text，确保所有框都有“下一项”按钮
-        input.type = 'text';
+        // 核心修改：使用 type="number"，完美唤起带 Next 键的数字符号键盘
+        input.type = 'number';
         input.id = 'h' + i;
         input.className = 'input-field';
         input.enterkeyhint = 'next';
@@ -195,7 +196,6 @@
     // 2. 魔法：监听所有输入框，变绿 + 回车跳跃
     const allInputs = document.querySelectorAll('.input-field');
     allInputs.forEach((input, index) => {
-        // 变绿逻辑
         input.addEventListener('input', function() {
             if (this.value.trim() !== '') {
                 this.classList.add('is-filled');
@@ -204,15 +204,14 @@
             }
         });
 
-        // 回车跳跃逻辑
         input.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
                 if (this.tagName === 'INPUT') {
-                    e.preventDefault(); // 阻止默认换行
+                    e.preventDefault(); 
                     if (index < allInputs.length - 1) {
-                        allInputs[index + 1].focus(); // 跳到下一个
+                        allInputs[index + 1].focus(); 
                     } else {
-                        this.blur(); // 最后一个收起键盘
+                        this.blur(); 
                     }
                 }
             }
@@ -221,7 +220,6 @@
 
     // 3. 生成报告逻辑
     function generateReport() {
-        // 处理时间格式
         let endTimeInput = document.getElementById('end_time');
         let timeStr = endTimeInput.value.trim();
         if (timeStr) {
@@ -229,11 +227,10 @@
                 timeStr += ":00";
             }
             timeStr = timeStr.replace("：", ":");
-            endTimeInput.value = timeStr; // 自动纠正 UI
+            endTimeInput.value = timeStr; 
             endTimeInput.classList.add('is-filled');
         }
 
-        // 计算工时和效率
         let totalHours = 0;
         for (let i = 10; i <= 22; i++) {
             let val = parseFloat(document.getElementById('h' + i).value);
@@ -247,25 +244,21 @@
         
         let eff = totalHours > 0 ? (qty / totalHours) : 0;
 
-        // 获取日期 (格式 05/31)
         let d = new Date();
         let month = String(d.getMonth() + 1).padStart(2, '0');
         let day = String(d.getDate()).padStart(2, '0');
         let today = `${month}/${day}`;
 
-        // 组装文本
         let baseReport = `${today}\n\n截止时间：${timeStr}\n维修工时：${totalHours.toFixed(1)}\n维修效率：${eff.toFixed(2)}`;
         let notes = document.getElementById('notes').value.trim();
         let finalReport = notes ? `${baseReport}\n\n分享：\n${notes}` : baseReport;
 
-        // 显示结果
         document.getElementById('report-output').innerHTML = finalReport.replace(/\n/g, '<br>');
         document.getElementById('hidden-copy-text').value = finalReport;
         
         let resultSection = document.getElementById('result-section');
         resultSection.style.display = 'block';
 
-        // 丝滑滚动到结果区
         setTimeout(() => {
             resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 100);
@@ -275,17 +268,17 @@
     function copyReport() {
         let copyText = document.getElementById('hidden-copy-text');
         copyText.select();
-        copyText.setSelectionRange(0, 99999); // 兼容手机端
+        copyText.setSelectionRange(0, 99999); 
         document.execCommand("copy");
 
         let btn = document.getElementById('copy-btn');
         let originalText = btn.innerText;
         btn.innerText = "复制成功！";
-        btn.style.backgroundColor = "#dcf5d0"; // 变绿
+        btn.style.backgroundColor = "#dcf5d0"; 
         
         setTimeout(() => {
             btn.innerText = originalText;
-            btn.style.backgroundColor = "#f8cbcc"; // 恢复粉色
+            btn.style.backgroundColor = "#f8cbcc"; 
         }, 2000);
     }
 
@@ -293,14 +286,12 @@
     function clearData() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
         setTimeout(() => {
-            // 清空所有输入
             allInputs.forEach(input => {
                 input.value = '';
                 input.classList.remove('is-filled');
             });
-            // 隐藏结果区
             document.getElementById('result-section').style.display = 'none';
-        }, 300); // 等滚动动画快结束时再清空，视觉更平滑
+        }, 300); 
     }
 </script>
 
