@@ -152,15 +152,17 @@ if generate_clicked:
     
     # 计算总工时和效率
     total_hours = sum([st.session_state[f"h{h}"] for h in range(10, 23) if st.session_state[f"h{h}"] is not None])
-    qty_val = st.session_state.qty
-    eff = (qty_val / total_hours) if (qty_val is not None and total_hours > 0) else 0
+    qty_val = st.session_state.qty if st.session_state.qty is not None else 0
+    eff = (qty_val / total_hours) if (total_hours > 0) else 0
     
     # 获取今天日期
     today = datetime.date.today().strftime("%m/%d")
     
+    # 修改后的模版内容
     base_report = f"""{today}
 
 截止时间：{formatted_time}
+维修数量：{int(qty_val)}
 维修工时：{total_hours:.1f}
 维修效率：{eff:.2f}"""
 
@@ -188,7 +190,7 @@ if st.session_state.report_text:
     
     st.markdown("<hr>", unsafe_allow_html=True)
     
-    # 注入 HTML 复制按钮 (带 readonly 防键盘弹出)
+    # 注入 HTML 复制按钮
     html_code = f"""
     <div style="padding: 5px 0; display: flex; justify-content: center; width: 100%;">
         <textarea id="hiddenText" readonly style="position:absolute; left:-9999px;">{st.session_state.report_text}</textarea>
@@ -221,78 +223,38 @@ if st.session_state.report_text:
         if st.button("刷新页面", type="secondary"):
             components.html("<script>window.parent.location.reload();</script>", height=0)
 
-# 7. 注入全局前端魔法脚本 (变绿 + 回车跳跃 + 强制隐藏右下角徽章)
+# 7. 注入全局前端魔法脚本
 magic_js = """
 <script>
 const doc = window.parent.document;
-
-// --- 徽章杀手：暴力隐藏右下角的头像和红船 ---
 function killBadge() {
-    // 1. 通过类名查找并隐藏
     const badges = doc.querySelectorAll('[class*="viewerBadge"], [class*="styles_viewerBadge"]');
-    badges.forEach(b => {
-        b.style.display = 'none';
-        b.style.opacity = '0';
-        b.style.visibility = 'hidden';
-    });
-    
-    // 2. 暴力查找右下角的悬浮元素 (双重保险)
-    const allDivs = doc.querySelectorAll('div');
-    allDivs.forEach(div => {
-        const style = window.getComputedStyle(div);
-        if (style.position === 'fixed' && style.bottom !== 'auto' && style.right !== 'auto') {
-            // 如果这个悬浮窗里面包含 svg (红船) 或者 img (头像)，直接干掉
-            if (div.innerHTML.includes('svg') || div.innerHTML.includes('img')) {
-                div.style.display = 'none';
-            }
-        }
-    });
+    badges.forEach(b => { b.style.display = 'none'; });
 }
-
 function enhanceInputs() {
-    // 每次检查输入框状态时，顺便执行一次徽章杀手
     killBadge();
-
     const inputs = Array.from(doc.querySelectorAll('input:not([type="hidden"]), textarea'));
-    
     inputs.forEach((input, index) => {
-        // 1. 改变 iOS 键盘的 "换行" 按钮为 "下一项" (Next)
-        if (index < inputs.length - 1) {
-            input.setAttribute('enterkeyhint', 'next');
-        } else {
-            input.setAttribute('enterkeyhint', 'done');
-        }
-
-        // 2. 检查是否有值，如果有值就加上 'is-filled' 的 CSS 类让它变绿
+        if (index < inputs.length - 1) { input.setAttribute('enterkeyhint', 'next'); } 
+        else { input.setAttribute('enterkeyhint', 'done'); }
         const wrapper = input.closest('div[data-baseweb="input"]') || input.closest('div[data-baseweb="textarea"]');
         if (wrapper) {
-            if (input.value && input.value.trim() !== '') {
-                wrapper.classList.add('is-filled');
-            } else {
-                wrapper.classList.remove('is-filled');
-            }
+            if (input.value && input.value.trim() !== '') { wrapper.classList.add('is-filled'); }
+            else { wrapper.classList.remove('is-filled'); }
         }
     });
 }
-
-// 立即执行一次，并每半秒检查一次状态
 killBadge();
 setInterval(enhanceInputs, 500);
 doc.body.addEventListener('input', enhanceInputs);
-
-// 3. 监听回车键 (Enter)
 doc.body.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') {
         if (e.target.tagName === 'INPUT') {
             e.preventDefault(); 
             const inputs = Array.from(doc.querySelectorAll('input:not([type="hidden"]), textarea'));
             const currentIndex = inputs.indexOf(e.target);
-            
-            if (currentIndex > -1 && currentIndex < inputs.length - 1) {
-                inputs[currentIndex + 1].focus();
-            } else {
-                e.target.blur();
-            }
+            if (currentIndex > -1 && currentIndex < inputs.length - 1) { inputs[currentIndex + 1].focus(); }
+            else { e.target.blur(); }
         }
     }
 }, true);
