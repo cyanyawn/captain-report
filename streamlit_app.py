@@ -276,7 +276,7 @@ if shared_data["is_active"]:
     """
     st.markdown(card_html, unsafe_allow_html=True)
 
-# 9. 注入全局前端魔法脚本 (精确锁定数字全键盘 + 回车跳跃)
+# 9. 注入全局前端魔法脚本 (绝对不改键盘，只保留 Next 连点和变绿)
 magic_js = """
 <script>
 const doc = window.parent.document;
@@ -291,26 +291,17 @@ function enhanceInputs() {
     const inputs = Array.from(doc.querySelectorAll('input:not([type="hidden"]), textarea'));
     
     inputs.forEach((input, index) => {
-        // --- 终极键盘精准锁定魔法 ---
-        // 通过 aria-label (我们在 Python 里设定的隐形标签) 来精准判断
-        let label = input.getAttribute('aria-label');
+        // --- 核心修复：绝对不加任何 inputmode，保持最纯粹的 QWERTY 全键盘 ---
+        input.removeAttribute('inputmode');
         
-        // 如果是“更新人”或者隐藏的密码信号框，使用普通全键盘
-        if (label === 'updater' || label === 'auth_signal') {
-            input.removeAttribute('inputmode');
-        } else {
-            // 其他所有的框（时间、数量、工时），强制使用带小数点的数字全键盘！
-            input.setAttribute('inputmode', 'decimal');
-        }
-        
-        // 设置 Next 键连点逻辑
+        // 保留 Next 键连点逻辑
         if (index < inputs.length - 1) {
             input.setAttribute('enterkeyhint', 'next');
         } else {
             input.setAttribute('enterkeyhint', 'done');
         }
 
-        // 绿框微交互
+        // 保留变绿微交互
         const wrapper = input.closest('div[data-baseweb="input"]');
         if (wrapper) {
             if (input.value && input.value.trim() !== '') {
