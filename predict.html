@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="产能监控">
-    <title>实时产能监控看板 V2.0</title>
+    <meta name="apple-mobile-web-app-title" content="预计维修数量工具">
+    <title>预计维修数量工具 V1.0</title>
     <style>
         /* --- 全局样式重置 --- */
         body {
@@ -185,11 +185,16 @@
 <body>
 
 <div class="container">
-    <h1>实时产能监控看板 V2.0</h1>
+    <h1>预计维修数量工具 V1.0</h1>
     <hr style="margin-top: -5px;">
 
-    <div class="section-title">关店时间 <span class="section-subtitle">(24小时制数字)</span></div>
-    <input type="number" id="close_time" class="input-field" placeholder="例如: 22 代表晚上10点" enterkeyhint="next">
+    <!-- 动态关店时间 -->
+    <div class="section-title">关店时间 <span class="section-subtitle">(支持半小时，如 22.5)</span></div>
+    <input type="text" inputmode="decimal" id="close_time" class="input-field" placeholder="例如: 22.5 代表晚上10点半" enterkeyhint="next">
+
+    <!-- 新增：动态维修效率 -->
+    <div class="section-title">单台维修耗时 <span class="section-subtitle">(分钟/台)</span></div>
+    <input type="text" inputmode="decimal" id="efficiency" class="input-field status-valid" value="40" placeholder="例如: 40" enterkeyhint="next">
 
     <div class="section-title">维修工时排班 <span class="section-subtitle">(随时可加减修改)</span></div>
     <div id="hours-container">
@@ -197,14 +202,12 @@
     </div>
 
     <div class="section-title">当前等待维修数量 <span class="section-subtitle">(积压排队的设备数)</span></div>
-    <input type="number" id="wait_qty" class="input-field" placeholder="请输入等待数量" enterkeyhint="next">
+    <input type="text" inputmode="decimal" id="wait_qty" class="input-field" placeholder="请输入等待数量" enterkeyhint="next">
 
-    <!-- 新增：正在维修数量 -->
     <div class="section-title">当前正在维修数量 <span class="section-subtitle">(操作台上的设备数)</span></div>
-    <input type="number" id="repairing_qty" class="input-field" placeholder="请输入正在维修数量" enterkeyhint="done">
+    <input type="text" inputmode="decimal" id="repairing_qty" class="input-field" placeholder="请输入正在维修数量" enterkeyhint="done">
 
-    <!-- 激活监控按钮 -->
-    <button class="btn-predict" onclick="activateDashboard()">📊 激活实时监控看板</button>
+    <button class="btn-predict" onclick="activateDashboard()">计算</button>
     
     <!-- 实时看板卡片 -->
     <div id="prediction-card" class="prediction-card">
@@ -246,7 +249,8 @@
     const hoursContainer = document.getElementById('hours-container');
     for (let i = 10; i <= 22; i++) {
         let input = document.createElement('input');
-        input.type = 'number';
+        input.type = 'text';
+        input.inputMode = 'decimal';
         input.id = 'h' + i;
         input.className = 'input-field';
         input.setAttribute('enterkeyhint', 'next');
@@ -266,6 +270,7 @@
             if (document.activeElement === el) el.classList.add('status-focus');
             return;
         }
+        // 允许输入整数或带小数点的数字
         let isValid = /^\d*\.?\d+$/.test(val);
         if (isValid) el.classList.add('status-valid');
         else el.classList.add('status-error');
@@ -276,9 +281,8 @@
     allInputs.forEach((input, index) => {
         input.addEventListener('input', () => {
             checkInputStatus(input);
-            // 魔法：如果看板已经激活，任何输入都会瞬间触发重新计算！
             if (isDashboardActive) {
-                updateDashboard(true); // true 表示静默更新，不弹错误提示
+                updateDashboard(true); 
             }
         });
         
@@ -298,19 +302,30 @@
 
     // --- 核心逻辑：激活看板 ---
     function activateDashboard() {
-        updateDashboard(false); // false 表示点击按钮主动触发，如果有错要弹窗提示
+        updateDashboard(false); 
     }
 
     // --- 核心逻辑：实时计算与更新 UI ---
     function updateDashboard(isSilentMode) {
+        // 1. 获取关店时间
         let closeTimeStr = document.getElementById('close_time').value.trim();
-        let closeHour = parseInt(closeTimeStr, 10);
+        let closeHour = parseFloat(closeTimeStr);
         
-        // 如果关店时间没填对
         if (isNaN(closeHour) || closeHour < 10 || closeHour > 24) {
             if (!isSilentMode) {
-                alert("请先在最上方填写正确的关店时间 (例如 18 到 22 之间的数字)！");
+                alert("请先在最上方填写正确的关店时间 (例如 22 或 22.5)！");
                 document.getElementById('close_time').focus();
+            }
+            return;
+        }
+
+        // 2. 获取单台维修耗时 (默认 40)
+        let effStr = document.getElementById('efficiency').value.trim();
+        let minsPerDevice = parseFloat(effStr);
+        if (isNaN(minsPerDevice) || minsPerDevice <= 0) {
+            if (!isSilentMode) {
+                alert("请填写正确的单台维修耗时 (必须大于0的数字)！");
+                document.getElementById('efficiency').focus();
             }
             return;
         }
@@ -322,7 +337,10 @@
         
         // 只有当前时间早于关店时间，才累加剩余工时
         if (startHour < closeHour) {
-            for (let i = startHour; i <= closeHour; i++) {
+            let maxBoxHour = Math.floor(closeHour);
+            if (maxBoxHour > 22) maxBoxHour = 22; 
+            
+            for (let i = startHour; i <= maxBoxHour; i++) {
                 let inputEl = document.getElementById('h' + i);
                 if (inputEl) {
                     let valStr = inputEl.value.trim();
@@ -333,19 +351,18 @@
             }
         }
 
-        // 获取等待和正在维修的数量 (如果没填就默认为 0)
         let waitQty = parseInt(document.getElementById('wait_qty').value.trim(), 10) || 0;
         let repairingQty = parseInt(document.getElementById('repairing_qty').value.trim(), 10) || 0;
 
-        // 计算逻辑：总产能 = 剩余工时 / (40/60)
-        let totalCapacity = Math.floor(remainingHours / (40 / 60));
-        
-        // 还可以接单 = 总产能 - 等待数量 - 正在维修数量
+        // 核心修改：总产能 = 剩余工时 / (单台耗时分钟数 / 60)
+        let totalCapacity = Math.floor(remainingHours / (minsPerDevice / 60));
         let canAccept = totalCapacity - waitQty - repairingQty;
 
-        // 更新 UI
+        let closeHourDisplay = Math.floor(closeHour);
+        let closeMinDisplay = (closeHour % 1 === 0.5) ? "30" : "00";
+
         document.getElementById('pred-time-start').innerText = startHour + ":00";
-        document.getElementById('pred-time-end').innerText = closeHour + ":00"; 
+        document.getElementById('pred-time-end').innerText = closeHourDisplay + ":" + closeMinDisplay; 
         document.getElementById('pred-hours').innerText = remainingHours.toFixed(1);
         document.getElementById('pred-total-capacity').innerText = totalCapacity;
         document.getElementById('pred-waiting').innerText = waitQty;
@@ -354,26 +371,24 @@
         let acceptEl = document.getElementById('pred-can-accept');
         let warningEl = document.getElementById('pred-warning');
 
-        // 超负荷警告逻辑
         if (canAccept < 0) {
             acceptEl.innerText = "0";
-            acceptEl.style.color = "#FF3B30"; // 红色
+            acceptEl.style.color = "#FF3B30"; 
             warningEl.innerText = `⚠️ 警告：当前任务已超出剩余产能 ${Math.abs(canAccept)} 台！`;
             warningEl.style.color = "#FF3B30";
         } else {
             acceptEl.innerText = canAccept;
-            acceptEl.style.color = "#6200EE"; // 紫色
-            warningEl.innerText = "* 按单台耗时 40 分钟计算";
+            acceptEl.style.color = "#6200EE"; 
+            // 动态更新提示文案
+            warningEl.innerText = `* 按单台耗时 ${minsPerDevice} 分钟计算`;
             warningEl.style.color = "#7E6BC4";
         }
 
-        // 如果看板还没显示，就显示出来
         if (!isDashboardActive) {
             let card = document.getElementById('prediction-card');
             card.style.display = 'block';
             isDashboardActive = true;
             
-            // 第一次激活时，丝滑滚动到看板
             setTimeout(() => {
                 card.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }, 100);
@@ -384,12 +399,16 @@
     function clearData() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
         setTimeout(() => {
+            const allInputs = document.querySelectorAll('.input-field');
             allInputs.forEach(input => {
-                input.value = '';
-                checkInputStatus(input); 
+                // 不清空维修效率，保持默认值或用户修改的值
+                if (input.id !== 'efficiency') {
+                    input.value = '';
+                    checkInputStatus(input); 
+                }
             });
             document.getElementById('prediction-card').style.display = 'none';
-            isDashboardActive = false; // 重置激活状态
+            isDashboardActive = false; 
         }, 300); 
     }
 </script>
