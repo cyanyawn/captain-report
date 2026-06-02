@@ -172,7 +172,7 @@
     <h1>预计维修数量工具 V1.0</h1>
     <hr style="margin-top: -5px;">
 
-    <!-- 新增：动态关店时间 -->
+    <!-- 动态关店时间 -->
     <div class="section-title">关店时间 <span class="section-subtitle">(24小时制数字)</span></div>
     <input type="number" id="close_time" class="input-field" placeholder="例如: 22 代表晚上10点" enterkeyhint="next">
 
@@ -185,8 +185,8 @@
     <div class="section-title">当前等待维修数量 <span class="section-subtitle">(目前积压排队的设备数)</span></div>
     <input type="number" id="wait_qty" class="input-field" placeholder="请输入等待数量" enterkeyhint="done">
 
-    <!-- 实时产能预测按钮与卡片 -->
-    <button class="btn-predict" onclick="predictCapacity()">📊 计算剩余产能预测</button>
+    <!-- 核心修改：按钮文案更新 -->
+    <button class="btn-predict" onclick="predictCapacity()">📊 计算可接入数量</button>
     
     <div id="prediction-card" class="prediction-card">
         <div class="pred-title">⏱️ 实时产能看板</div>
@@ -217,7 +217,6 @@
 
 <script>
     // 1. 初始化：生成 10 到 22 的工时输入框
-    // 界面上依然显示全天的框，方便随时修改，但底层的计算逻辑会变聪明
     const hoursContainer = document.getElementById('hours-container');
     for (let i = 10; i <= 22; i++) {
         let input = document.createElement('input');
@@ -290,7 +289,6 @@
         // 3. 核心：只累加从【当前时间】到【你填写的关店时间】的工时
         for (let i = startHour; i <= closeHour; i++) {
             let inputEl = document.getElementById('h' + i);
-            // 如果你填的关店时间（比如24点）超出了我们预设的输入框范围，就忽略
             if (inputEl) {
                 let valStr = inputEl.value.trim();
                 if (/^\d*\.?\d+$/.test(valStr)) {
@@ -311,7 +309,7 @@
 
         // 6. 更新 UI
         document.getElementById('pred-time-start').innerText = startHour + ":00";
-        document.getElementById('pred-time-end').innerText = closeHour + ":00"; // 显示关店时间
+        document.getElementById('pred-time-end').innerText = closeHour + ":00"; 
         document.getElementById('pred-hours').innerText = remainingHours.toFixed(1);
         document.getElementById('pred-total-capacity').innerText = totalCapacity;
         document.getElementById('pred-waiting').innerText = waitQty;
