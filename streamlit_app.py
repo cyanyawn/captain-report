@@ -223,4 +223,140 @@ if shared_data["is_active"]:
     
     remaining_hours = 0.0
     if start_hour < close_hour:
-        max_box_hour = min(22
+        max_box_hour = min(22, int(close_hour))
+        for i in range(start_hour, max_box_hour + 1):
+            remaining_hours += calc_val(shared_data["hours"][i])
+            
+    wait_qty = int(calc_val(shared_data["wait_qty"]))
+    repairing_qty = int(calc_val(shared_data["repairing_qty"]))
+    
+    total_capacity = int(remaining_hours / (mins_per_device / 60))
+    can_accept = total_capacity - wait_qty - repairing_qty
+    
+    close_hour_display = int(close_hour)
+    close_min_display = "30" if close_hour % 1 == 0.5 else "00"
+    end_time_str = f"{close_hour_display}:{close_min_display}"
+    
+    accept_color = "#FF3B30" if can_accept < 0 else "#6200EE"
+    accept_display = 0 if can_accept < 0 else can_accept
+    
+    warning_html = f"""<div class="pred-note" style="color: #FF3B30;">⚠️ 警告：当前任务已超出剩余产能 {abs(can_accept)} 台！</div>""" if can_accept < 0 else f"""<div class="pred-note">* 按单台耗时 {int(mins_per_device)} 分钟计算</div>"""
+
+    card_html = f"""
+    <div class="prediction-card">
+        <div class="pred-title">
+            <span>⏱️ 团队产能看板</span>
+            <span style="font-size: 12px; color: #7E6BC4; font-weight: normal;">上次更新: {shared_data['updater_name']} @ {shared_data['update_time']}</span>
+        </div>
+        <div class="pred-data-row">
+            <span>从 <strong>{start_hour}:00</strong> 到 <strong>{end_time_str}</strong> 剩余工时：</span>
+            <span><span class="pred-highlight">{remaining_hours:.1f}</span> h</span>
+        </div>
+        <div class="pred-data-row">
+            <span>剩余工时总产能：</span>
+            <span><span class="pred-highlight">{total_capacity}</span> 台</span>
+        </div>
+        <div class="pred-data-row">
+            <span>减去当前等待维修：</span>
+            <span><span class="pred-highlight" style="color: #FF3B30;">{wait_qty}</span> 台</span>
+        </div>
+        <div class="pred-data-row">
+            <span>减去当前正在维修：</span>
+            <span><span class="pred-highlight" style="color: #FF3B30;">{repairing_qty}</span> 台</span>
+        </div>
+        <hr class="dashed">
+        <div class="pred-data-row" style="font-size: 18px; font-weight: bold;">
+            <span>✨ 还可以接入新单：</span>
+            <span><span class="pred-highlight" style="font-size: 24px; color: {accept_color};">{accept_display}</span> 台</span>
+        </div>
+        {warning_html}
+    </div>
+    """
+    st.markdown(card_html, unsafe_allow_html=True)
+
+# 10. 手动清空与刷新按钮
+def clear_data():
+    shared_data["is_active"] = False
+    shared_data["wait_qty"] = None
+    shared_data["repairing_qty"] = None
+    for h in range(10, 23):
+        shared_data["hours"][h] = None
+    shared_data["updater_name"] = ""
+    shared_data["update_time"] = ""
+
+st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
+col_btn1, col_btn2 = st.columns(2)
+with col_btn1:
+    if st.button("刷新数据", type="secondary"):
+        # st.rerun() 会重新运行代码，拉取最新的 shared_data，但不会触发浏览器刷新
+        st.toast("🔄 数据已更新至最新！")
+        st.rerun()
+with col_btn2:
+    if st.button("清空今日数据", type="secondary"):
+        clear_data()
+        st.rerun()
+
+# 11. 注入全局前端魔法脚本
+magic_js = """
+<script>
+const doc = window.parent.document;
+
+function killBadge() {
+    const badges = doc.querySelectorAll('[class*="viewerBadge"], [class*="styles_viewerBadge"]');
+    badges.forEach(b => { b.style.display = 'none'; b.style.opacity = '0'; });
+}
+
+function enhanceInputs() {
+    killBadge();
+    const inputs = Array.from(doc.querySelectorAll('input:not([type="hidden"]), textarea'));
+    
+    inputs.forEach((input, index) => {
+        let label = input.getAttribute('aria-label');
+        if (label && label.startsWith('hour_')) {
+            let hour = label.split('_')[1];
+            input.setAttribute('placeholder', hour + ':00');
+        } else if (label === 'wait_qty') {
+            input.setAttribute('placeholder', '请输入等待数量');
+        } else if (label === 'repairing_qty') {
+            input.setAttribute('placeholder', '请输入正在维修数量');
+        }
+        
+        if (index < inputs.length - 1) {
+            input.setAttribute('enterkeyhint', 'next');
+        } else {
+            input.setAttribute('enterkeyhint', 'done');
+        }
+
+        const wrapper = input.closest('div[data-baseweb="input"]');
+        if (wrapper) {
+            if (input.value && input.value.trim() !== '') {
+                wrapper.classList.add('is-filled');
+            } else {
+                wrapper.classList.remove('is-filled');
+            }
+        }
+    });
+}
+
+killBadge();
+setInterval(enhanceInputs, 500);
+doc.body.addEventListener('input', enhanceInputs);
+
+doc.body.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        if (e.target.tagName === 'INPUT') {
+            e.preventDefault(); 
+            const inputs = Array.from(doc.querySelectorAll('input:not([type="hidden"]), textarea'));
+            const currentIndex = inputs.indexOf(e.target);
+            
+            if (currentIndex > -1 && currentIndex < inputs.length - 1) {
+                inputs[currentIndex + 1].focus();
+            } else {
+                e.target.blur();
+            }
+        }
+    }
+}, true);
+</script>
+"""
+components.html(magic_js, height=0)
