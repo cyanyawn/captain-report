@@ -172,9 +172,13 @@
     <h1>预计维修数量工具 V1.0</h1>
     <hr style="margin-top: -5px;">
 
+    <!-- 新增：动态关店时间 -->
+    <div class="section-title">关店时间 <span class="section-subtitle">(24小时制数字)</span></div>
+    <input type="number" id="close_time" class="input-field" placeholder="例如: 22 代表晚上10点" enterkeyhint="next">
+
     <div class="section-title">维修工时排班</div>
     <div id="hours-container">
-        <!-- JS 自动生成 -->
+        <!-- JS 自动生成 10 到 22 的输入框，但计算时会根据关店时间截断 -->
     </div>
 
     <!-- 等待维修数量输入框 -->
@@ -187,7 +191,7 @@
     <div id="prediction-card" class="prediction-card">
         <div class="pred-title">⏱️ 实时产能看板</div>
         <div class="pred-data-row">
-            <span>从 <strong id="pred-time-start">16:00</strong> 剩余排班工时：</span>
+            <span>从 <strong id="pred-time-start">16:00</strong> 到 <strong id="pred-time-end">22:00</strong> 剩余工时：</span>
             <span><span id="pred-hours" class="pred-highlight">0</span> h</span>
         </div>
         <div class="pred-data-row">
@@ -213,6 +217,7 @@
 
 <script>
     // 1. 初始化：生成 10 到 22 的工时输入框
+    // 界面上依然显示全天的框，方便随时修改，但底层的计算逻辑会变聪明
     const hoursContainer = document.getElementById('hours-container');
     for (let i = 10; i <= 22; i++) {
         let input = document.createElement('input');
@@ -233,9 +238,7 @@
             if (document.activeElement === el) el.classList.add('status-focus');
             return;
         }
-        // 只有数字输入框，直接验证纯数字
         let isValid = /^\d*\.?\d+$/.test(val);
-
         if (isValid) el.classList.add('status-valid');
         else el.classList.add('status-error');
     }
@@ -257,36 +260,58 @@
         });
     });
 
-    // --- 核心逻辑：带积压计算的产能预测 ---
+    // --- 核心逻辑：带动态关店时间的产能预测 ---
     function predictCapacity() {
+        // 1. 获取并验证关店时间
+        let closeTimeStr = document.getElementById('close_time').value.trim();
+        let closeHour = parseInt(closeTimeStr, 10);
+        
+        if (isNaN(closeHour) || closeHour < 10 || closeHour > 24) {
+            alert("请先在最上方填写正确的关店时间 (例如 18 到 22 之间的数字)！");
+            document.getElementById('close_time').focus();
+            return;
+        }
+
+        // 2. 获取当前系统时间
         let currentHour = new Date().getHours();
         
+        // 智能修正开始时间
         let startHour = currentHour;
         if (startHour < 10) startHour = 10;
-        if (startHour > 22) startHour = 22;
+        
+        // 防呆：如果当前时间已经超过了你填的关店时间
+        if (startHour >= closeHour) {
+            alert(`现在已经是 ${startHour}:00，已经超过或等于你设置的关店时间 ${closeHour}:00 啦！今天不能再接单了。`);
+            return;
+        }
 
         let remainingHours = 0;
         
-        // 累加剩余工时
-        for (let i = startHour; i <= 22; i++) {
-            let valStr = document.getElementById('h' + i).value.trim();
-            if (/^\d*\.?\d+$/.test(valStr)) {
-                remainingHours += parseFloat(valStr);
+        // 3. 核心：只累加从【当前时间】到【你填写的关店时间】的工时
+        for (let i = startHour; i <= closeHour; i++) {
+            let inputEl = document.getElementById('h' + i);
+            // 如果你填的关店时间（比如24点）超出了我们预设的输入框范围，就忽略
+            if (inputEl) {
+                let valStr = inputEl.value.trim();
+                if (/^\d*\.?\d+$/.test(valStr)) {
+                    remainingHours += parseFloat(valStr);
+                }
             }
         }
 
-        // 获取当前等待维修数量
+        // 4. 获取当前等待维修数量
         let waitQtyStr = document.getElementById('wait_qty').value.trim();
         let waitQty = /^\d*\.?\d+$/.test(waitQtyStr) ? parseInt(waitQtyStr, 10) : 0;
 
-        // 计算逻辑：总产能 = 剩余工时 / (40/60)
+        // 5. 计算逻辑：总产能 = 剩余工时 / (40/60)
         let totalCapacity = Math.floor(remainingHours / (40 / 60));
         
         // 还可以接单 = 总产能 - 等待数量
         let canAccept = totalCapacity - waitQty;
 
-        // 更新 UI
+        // 6. 更新 UI
         document.getElementById('pred-time-start').innerText = startHour + ":00";
+        document.getElementById('pred-time-end').innerText = closeHour + ":00"; // 显示关店时间
         document.getElementById('pred-hours').innerText = remainingHours.toFixed(1);
         document.getElementById('pred-total-capacity').innerText = totalCapacity;
         document.getElementById('pred-waiting').innerText = waitQty;
@@ -316,7 +341,7 @@
         }, 100);
     }
 
-    // 5. 刷新/清空逻辑
+    // 7. 刷新/清空逻辑
     function clearData() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
         setTimeout(() => {
