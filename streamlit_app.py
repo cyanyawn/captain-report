@@ -4,7 +4,7 @@ import datetime
 # 1. 页面配置
 st.set_page_config(page_title="预计维修数量工具", layout="centered")
 
-# 2. 强力 CSS：还原 UI 风格、隐藏水印
+# 2. 强力 CSS：隐藏多余元素，优化文本框外观
 st.markdown("""
     <style>
     /* 去除顶部留白 */
@@ -19,8 +19,7 @@ st.markdown("""
     
     .stApp {background-color: #FFFFFF;}
     
-    /* 隐藏数字输入框右侧的加减号 */
-    div[data-testid="stNumberInput"] button { display: none !important; }
+    /* 隐藏输入框的回车提示 */
     div[data-testid="InputInstructions"] { display: none !important; }
     
     /* 标签字体 */
@@ -130,47 +129,50 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # 3. 核心魔法：创建全局共享数据存储
-# @st.cache_resource 装饰器会让这个字典在所有用户的会话中保持唯一且共享
 @st.cache_resource
 def get_shared_data():
     return {
-        "close_time": 22.0,
-        "efficiency": 40.0,
-        "wait_qty": 0,
-        "repairing_qty": 0,
-        "hours": {h: 0.0 for h in range(10, 23)},
+        "close_time": "22",
+        "efficiency": "40",
+        "wait_qty": "",
+        "repairing_qty": "",
+        "hours": {h: "" for h in range(10, 23)},
         "show_dashboard": False
     }
 
 shared_data = get_shared_data()
 
+# 辅助函数：安全地将字符串转为浮点数
+def safe_float(val, default=0.0):
+    if not val: return default
+    try:
+        return float(val)
+    except ValueError:
+        return default
+
 # 4. 标题区
 st.markdown("<h1>预计维修数量工具 V1.0</h1>", unsafe_allow_html=True)
 st.markdown("<hr style='margin-top: -10px; border-top: 1px solid #d3d3d3;'>", unsafe_allow_html=True)
 
-# 5. 表单输入区 (直接绑定全局变量，一旦修改，立刻生效)
+# 5. 表单输入区 (使用 text_input 替代 number_input，默认值设为空字符串)
 
-# 关店时间
 st.markdown("关店时间 <span class='subtitle'>(支持半小时，如 22.5)</span>", unsafe_allow_html=True)
-shared_data["close_time"] = st.number_input("close_time", value=shared_data["close_time"], step=0.5, label_visibility="collapsed")
+shared_data["close_time"] = st.text_input("close_time", value=shared_data["close_time"], label_visibility="collapsed", placeholder="例如: 22.5")
 
-# 维修工时
 st.markdown("维修工时排班 <span class='subtitle'>(随时可加减修改)</span>", unsafe_allow_html=True)
 for h in range(10, 23):
-    val = st.number_input(f"{h}:00", value=shared_data["hours"][h], min_value=0.0, step=1.0)
+    # 默认值为空字符串，显示 placeholder
+    val = st.text_input(f"{h}:00", value=shared_data["hours"][h], placeholder=f"{h}:00", label_visibility="collapsed")
     shared_data["hours"][h] = val
 
-# 等待维修
 st.markdown("当前等待维修数量 <span class='subtitle'>(积压排队的设备数)</span>", unsafe_allow_html=True)
-shared_data["wait_qty"] = st.number_input("wait_qty", value=float(shared_data["wait_qty"]), min_value=0.0, step=1.0, label_visibility="collapsed")
+shared_data["wait_qty"] = st.text_input("wait_qty", value=shared_data["wait_qty"], label_visibility="collapsed", placeholder="请输入等待数量")
 
-# 正在维修
 st.markdown("当前正在维修数量 <span class='subtitle'>(操作台上的设备数)</span>", unsafe_allow_html=True)
-shared_data["repairing_qty"] = st.number_input("repairing_qty", value=float(shared_data["repairing_qty"]), min_value=0.0, step=1.0, label_visibility="collapsed")
+shared_data["repairing_qty"] = st.text_input("repairing_qty", value=shared_data["repairing_qty"], label_visibility="collapsed", placeholder="请输入正在维修数量")
 
-# 维修效率
 st.markdown("单台维修耗时 <span class='subtitle'>(分钟/台)</span>", unsafe_allow_html=True)
-shared_data["efficiency"] = st.number_input("efficiency", value=shared_data["efficiency"], min_value=1.0, step=1.0, label_visibility="collapsed")
+shared_data["efficiency"] = st.text_input("efficiency", value=shared_data["efficiency"], label_visibility="collapsed", placeholder="例如: 40")
 
 # 6. 按钮与计算逻辑
 if st.button("计算", type="primary"):
@@ -178,8 +180,9 @@ if st.button("计算", type="primary"):
 
 # 7. 渲染实时看板
 if shared_data["show_dashboard"]:
-    close_hour = shared_data["close_time"]
-    mins_per_device = shared_data["efficiency"]
+    close_hour = safe_float(shared_data["close_time"], 22.0)
+    mins_per_device = safe_float(shared_data["efficiency"], 40.0)
+    if mins_per_device <= 0: mins_per_device = 40.0 # 防呆
     
     current_hour = datetime.datetime.now().hour
     start_hour = max(10, current_hour)
@@ -188,10 +191,10 @@ if shared_data["show_dashboard"]:
     if start_hour < close_hour:
         max_box_hour = min(22, int(close_hour))
         for i in range(start_hour, max_box_hour + 1):
-            remaining_hours += shared_data["hours"][i]
+            remaining_hours += safe_float(shared_data["hours"][i])
             
-    wait_qty = int(shared_data["wait_qty"])
-    repairing_qty = int(shared_data["repairing_qty"])
+    wait_qty = int(safe_float(shared_data["wait_qty"]))
+    repairing_qty = int(safe_float(shared_data["repairing_qty"]))
     
     total_capacity = int(remaining_hours / (mins_per_device / 60))
     can_accept = total_capacity - wait_qty - repairing_qty
@@ -242,10 +245,10 @@ if shared_data["show_dashboard"]:
 
 # 8. 刷新/清空按钮
 def clear_data():
-    shared_data["wait_qty"] = 0.0
-    shared_data["repairing_qty"] = 0.0
+    shared_data["wait_qty"] = ""
+    shared_data["repairing_qty"] = ""
     for h in range(10, 23):
-        shared_data["hours"][h] = 0.0
+        shared_data["hours"][h] = ""
     shared_data["show_dashboard"] = False
 
 st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
