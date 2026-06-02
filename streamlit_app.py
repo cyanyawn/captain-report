@@ -16,7 +16,6 @@ st.markdown("""
     div[class*="viewerBadge"] {display: none !important;}
     .stApp {background-color: #FFFFFF;}
     
-    /* 隐藏输入框的回车提示和数字框的加减号 */
     div[data-testid="InputInstructions"] { display: none !important; }
     div[data-testid="stNumberInput"] button { display: none !important; }
     
@@ -140,30 +139,29 @@ def calc_val(v):
     return float(v) if v is not None else 0.0
 
 # -----------------------------------------
-# 5. 极简密码验证系统 (带 LocalStorage 记忆)
+# 5. 终极免密登录系统 (Query Params + LocalStorage)
 # -----------------------------------------
+if 'authenticated' not in st.session_state:
+    # 检查 URL 里有没有通行证
+    query_params = st.query_params
+    if query_params.get("auth") == "passed":
+        st.session_state.authenticated = True
+    else:
+        st.session_state.authenticated = False
+
+# 注入 JS 检查本地缓存
 auth_check_js = """
 <script>
     const doc = window.parent.document;
     if (localStorage.getItem('captain_auth') === '1984') {
-        let hiddenInput = doc.getElementById('auth_signal');
-        if (hiddenInput && hiddenInput.value !== 'passed') {
-            hiddenInput.value = 'passed';
-            hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
+        // 如果本地有密码，并且 URL 里没有通行证，就刷新网页并带上通行证
+        if (!window.parent.location.search.includes('auth=passed')) {
+            window.parent.location.search = '?auth=passed';
         }
     }
 </script>
 """
 components.html(auth_check_js, height=0)
-
-if 'authenticated' not in st.session_state:
-    st.session_state.authenticated = False
-
-auth_signal = st.text_input("auth_signal", key="auth_signal", label_visibility="collapsed", disabled=True)
-if auth_signal == 'passed':
-    st.session_state.authenticated = True
-
-st.markdown("""<style>div[data-testid="stTextInput"]:has(input[aria-label="auth_signal"]) {display: none !important;}</style>""", unsafe_allow_html=True)
 
 if not st.session_state.authenticated:
     st.markdown("<h2 style='text-align: center; color: #154A7F; margin-top: 80px;'>🔒 请输入访问口令</h2>", unsafe_allow_html=True)
@@ -174,9 +172,14 @@ if not st.session_state.authenticated:
         if st.button("进入系统", type="primary"):
             if pwd == "1984":
                 st.session_state.authenticated = True
-                save_auth_js = """<script>window.parent.localStorage.setItem('captain_auth', '1984');</script>"""
+                # 密码正确，存入本地缓存，并在 URL 加上通行证
+                save_auth_js = """
+                <script>
+                    window.parent.localStorage.setItem('captain_auth', '1984');
+                    window.parent.location.search = '?auth=passed';
+                </script>
+                """
                 components.html(save_auth_js, height=0)
-                st.rerun()
             else:
                 st.error("口令错误，请重试！")
     st.stop() 
@@ -188,7 +191,7 @@ st.markdown("<h1>预计维修数量工具 V1.0</h1>", unsafe_allow_html=True)
 st.markdown("<hr style='margin-top: -10px; border-top: 1px solid #d3d3d3;'>", unsafe_allow_html=True)
 
 # -----------------------------------------
-# 7. 表单输入区 (坚决使用 number_input 保护键盘)
+# 7. 表单输入区
 # -----------------------------------------
 st.markdown("更新人 <span class='subtitle'>(你的名字/昵称)</span>", unsafe_allow_html=True)
 updater_name = st.text_input("updater", value=shared_data["updater_name"], label_visibility="collapsed", placeholder="例如: Ice")
@@ -199,7 +202,6 @@ close_time_input = st.number_input("close_time", value=shared_data["close_time"]
 st.markdown("维修工时排班 <span class='subtitle'>(随时可加减修改)</span>", unsafe_allow_html=True)
 hours_input = {}
 for h in range(10, 23):
-    # 给每个框加上特定的 aria-label，方便底层 JS 找到它们并注入 placeholder
     hours_input[h] = st.number_input(f"hour_{h}", value=shared_data["hours"][h], min_value=0.0, step=1.0, label_visibility="collapsed")
 
 st.markdown("当前等待维修数量 <span class='subtitle'>(积压排队的设备数)</span>", unsafe_allow_html=True)
@@ -315,7 +317,7 @@ with col_clear2:
         clear_data()
         st.rerun()
 
-# 11. 注入全局前端魔法脚本 (强制注入 Placeholder + Next 连点)
+# 11. 注入全局前端魔法脚本
 magic_js = """
 <script>
 const doc = window.parent.document;
@@ -330,7 +332,6 @@ function enhanceInputs() {
     const inputs = Array.from(doc.querySelectorAll('input:not([type="hidden"]), textarea'));
     
     inputs.forEach((input, index) => {
-        // --- 核心修复：强行注入灰色的 Placeholder 提示 ---
         let label = input.getAttribute('aria-label');
         if (label && label.startsWith('hour_')) {
             let hour = label.split('_')[1];
@@ -341,14 +342,12 @@ function enhanceInputs() {
             input.setAttribute('placeholder', '请输入正在维修数量');
         }
         
-        // 保留 Next 连点
         if (index < inputs.length - 1) {
             input.setAttribute('enterkeyhint', 'next');
         } else {
             input.setAttribute('enterkeyhint', 'done');
         }
 
-        // 绿框微交互
         const wrapper = input.closest('div[data-baseweb="input"]');
         if (wrapper) {
             if (input.value && input.value.trim() !== '') {
