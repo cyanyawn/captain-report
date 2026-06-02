@@ -15,7 +15,10 @@ st.markdown("""
     [data-testid="stDeployButton"] {display: none !important;}
     div[class*="viewerBadge"] {display: none !important;}
     .stApp {background-color: #FFFFFF;}
+    
+    /* 隐藏输入框的回车提示和数字框的加减号 */
     div[data-testid="InputInstructions"] { display: none !important; }
+    div[data-testid="stNumberInput"] button { display: none !important; }
     
     label[data-testid="stWidgetLabel"] div {
         font-size: 15px !important;
@@ -98,7 +101,48 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------
-# 3. 极简密码验证系统 (带 LocalStorage 记忆)
+# 3. 获取北京时间
+# -----------------------------------------
+def get_bj_time():
+    return datetime.datetime.utcnow() + datetime.timedelta(hours=8)
+
+# -----------------------------------------
+# 4. 核心架构：全队共享数据 + 自动清空逻辑
+# -----------------------------------------
+@st.cache_resource
+def get_shared_data():
+    return {
+        "date": get_bj_time().date(), # 记录数据是哪天的
+        "is_active": False,
+        "close_time": 22.0,
+        "efficiency": 40.0,
+        "wait_qty": None,
+        "repairing_qty": None,
+        "hours": {h: None for h in range(10, 23)},
+        "updater_name": "",
+        "update_time": ""
+    }
+
+shared_data = get_shared_data()
+
+# 【午夜自动清空逻辑】
+today_date = get_bj_time().date()
+if shared_data["date"] < today_date:
+    # 到了新的一天，自动清空排班数据，但保留关店时间和效率设置
+    shared_data["date"] = today_date
+    shared_data["is_active"] = False
+    shared_data["wait_qty"] = None
+    shared_data["repairing_qty"] = None
+    for h in range(10, 23):
+        shared_data["hours"][h] = None
+    shared_data["updater_name"] = ""
+    shared_data["update_time"] = ""
+
+def calc_val(v):
+    return float(v) if v is not None else 0.0
+
+# -----------------------------------------
+# 5. 极简密码验证系统 (带 LocalStorage 记忆)
 # -----------------------------------------
 auth_check_js = """
 <script>
@@ -140,54 +184,37 @@ if not st.session_state.authenticated:
     st.stop() 
 
 # -----------------------------------------
-# 4. 核心架构：全队共享数据
+# 6. 标题区
 # -----------------------------------------
-@st.cache_resource
-def get_shared_data():
-    return {
-        "is_active": False,
-        "close_time": "22",
-        "efficiency": "40",
-        "wait_qty": "",
-        "repairing_qty": "",
-        "hours": {h: "" for h in range(10, 23)},
-        "updater_name": "",
-        "update_time": ""
-    }
-
-shared_data = get_shared_data()
-
-def safe_float(val, default=0.0):
-    if not val: return default
-    try: return float(val)
-    except ValueError: return default
-
-# 5. 标题区
 st.markdown("<h1>预计维修数量工具 V1.0</h1>", unsafe_allow_html=True)
 st.markdown("<hr style='margin-top: -10px; border-top: 1px solid #d3d3d3;'>", unsafe_allow_html=True)
 
-# 6. 表单输入区
+# -----------------------------------------
+# 7. 表单输入区 (核心修复：全部改回 number_input 唤起完美键盘)
+# -----------------------------------------
 st.markdown("更新人 <span class='subtitle'>(你的名字/昵称)</span>", unsafe_allow_html=True)
+# 名字用 text_input，调出字母键盘
 updater_name = st.text_input("updater", value=shared_data["updater_name"], label_visibility="collapsed", placeholder="例如: Ice")
 
 st.markdown("关店时间 <span class='subtitle'>(支持半小时，如 22.5)</span>", unsafe_allow_html=True)
-close_time_input = st.text_input("close_time", value=shared_data["close_time"], label_visibility="collapsed", placeholder="例如: 22.5")
+close_time_input = st.number_input("close_time", value=shared_data["close_time"], step=0.5, label_visibility="collapsed")
 
 st.markdown("维修工时排班 <span class='subtitle'>(随时可加减修改)</span>", unsafe_allow_html=True)
 hours_input = {}
 for h in range(10, 23):
-    hours_input[h] = st.text_input(f"{h}:00", value=shared_data["hours"][h], placeholder=f"{h}:00", label_visibility="collapsed")
+    # 用 number_input + value=None，完美实现空框 + 完美数字键盘
+    hours_input[h] = st.number_input(f"{h}:00", value=shared_data["hours"][h], min_value=0.0, step=1.0, label_visibility="collapsed")
 
 st.markdown("当前等待维修数量 <span class='subtitle'>(积压排队的设备数)</span>", unsafe_allow_html=True)
-wait_qty_input = st.text_input("wait_qty", value=shared_data["wait_qty"], label_visibility="collapsed", placeholder="请输入等待数量")
+wait_qty_input = st.number_input("wait_qty", value=shared_data["wait_qty"], min_value=0.0, step=1.0, label_visibility="collapsed")
 
 st.markdown("当前正在维修数量 <span class='subtitle'>(操作台上的设备数)</span>", unsafe_allow_html=True)
-repairing_qty_input = st.text_input("repairing_qty", value=shared_data["repairing_qty"], label_visibility="collapsed", placeholder="请输入正在维修数量")
+repairing_qty_input = st.number_input("repairing_qty", value=shared_data["repairing_qty"], min_value=0.0, step=1.0, label_visibility="collapsed")
 
 st.markdown("单台维修耗时 <span class='subtitle'>(分钟/台)</span>", unsafe_allow_html=True)
-efficiency_input = st.text_input("efficiency", value=shared_data["efficiency"], label_visibility="collapsed", placeholder="例如: 40")
+efficiency_input = st.number_input("efficiency", value=shared_data["efficiency"], min_value=1.0, step=1.0, label_visibility="collapsed")
 
-# 7. 计算按钮
+# 8. 计算按钮
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
     generate_clicked = st.button("计算", type="primary")
@@ -196,41 +223,39 @@ if generate_clicked:
     if not updater_name.strip():
         st.warning("请在最上方填写更新人姓名！")
     else:
-        bj_time = datetime.datetime.utcnow() + datetime.timedelta(hours=8)
-        
         shared_data["updater_name"] = updater_name.strip()
-        shared_data["update_time"] = bj_time.strftime("%H:%M")
-        shared_data["close_time"] = close_time_input.strip()
-        shared_data["efficiency"] = efficiency_input.strip()
-        shared_data["wait_qty"] = wait_qty_input.strip()
-        shared_data["repairing_qty"] = repairing_qty_input.strip()
+        shared_data["update_time"] = get_bj_time().strftime("%H:%M")
+        shared_data["close_time"] = close_time_input
+        shared_data["efficiency"] = efficiency_input
+        shared_data["wait_qty"] = wait_qty_input
+        shared_data["repairing_qty"] = repairing_qty_input
         for h in range(10, 23):
-            shared_data["hours"][h] = hours_input[h].strip()
+            shared_data["hours"][h] = hours_input[h]
         
         shared_data["is_active"] = True
         st.toast("✅ 数据已同步至全队看板！", icon="🚀")
 
-# 8. 渲染全队共享的实时看板
+# 9. 渲染全队共享的实时看板
 if shared_data["is_active"]:
     st.markdown("<div id='report_target'></div>", unsafe_allow_html=True)
     if generate_clicked:
         st.markdown("""<img src="x" onerror="setTimeout(function(){var t=window.parent.document.getElementById('report_target'); if(t){t.scrollIntoView({behavior: 'smooth', block: 'start'});}}, 300);" style="display:none;">""", unsafe_allow_html=True)
 
-    close_hour = safe_float(shared_data["close_time"], 22.0)
-    mins_per_device = safe_float(shared_data["efficiency"], 40.0)
+    close_hour = shared_data["close_time"]
+    mins_per_device = shared_data["efficiency"]
     if mins_per_device <= 0: mins_per_device = 40.0 
     
-    current_hour = (datetime.datetime.utcnow() + datetime.timedelta(hours=8)).hour
+    current_hour = get_bj_time().hour
     start_hour = max(10, current_hour)
     
     remaining_hours = 0.0
     if start_hour < close_hour:
         max_box_hour = min(22, int(close_hour))
         for i in range(start_hour, max_box_hour + 1):
-            remaining_hours += safe_float(shared_data["hours"][i])
+            remaining_hours += calc_val(shared_data["hours"][i])
             
-    wait_qty = int(safe_float(shared_data["wait_qty"]))
-    repairing_qty = int(safe_float(shared_data["repairing_qty"]))
+    wait_qty = int(calc_val(shared_data["wait_qty"]))
+    repairing_qty = int(calc_val(shared_data["repairing_qty"]))
     
     total_capacity = int(remaining_hours / (mins_per_device / 60))
     can_accept = total_capacity - wait_qty - repairing_qty
@@ -276,7 +301,24 @@ if shared_data["is_active"]:
     """
     st.markdown(card_html, unsafe_allow_html=True)
 
-# 9. 注入全局前端魔法脚本 (绝对不改键盘，只保留 Next 连点和变绿)
+# 10. 手动清空按钮
+def clear_data():
+    shared_data["is_active"] = False
+    shared_data["wait_qty"] = None
+    shared_data["repairing_qty"] = None
+    for h in range(10, 23):
+        shared_data["hours"][h] = None
+    shared_data["updater_name"] = ""
+    shared_data["update_time"] = ""
+
+st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
+col_clear1, col_clear2, col_clear3 = st.columns([1, 2, 1])
+with col_clear2:
+    if st.button("清空今日数据", type="secondary"):
+        clear_data()
+        st.rerun()
+
+# 11. 注入全局前端魔法脚本 (去除了所有键盘干扰，只保留 Next 连点和绿框)
 magic_js = """
 <script>
 const doc = window.parent.document;
@@ -291,17 +333,14 @@ function enhanceInputs() {
     const inputs = Array.from(doc.querySelectorAll('input:not([type="hidden"]), textarea'));
     
     inputs.forEach((input, index) => {
-        // --- 核心修复：绝对不加任何 inputmode，保持最纯粹的 QWERTY 全键盘 ---
-        input.removeAttribute('inputmode');
+        // 绝对不改键盘类型，原汁原味保留 Streamlit 的 number_input 键盘！
         
-        // 保留 Next 键连点逻辑
         if (index < inputs.length - 1) {
             input.setAttribute('enterkeyhint', 'next');
         } else {
             input.setAttribute('enterkeyhint', 'done');
         }
 
-        // 保留变绿微交互
         const wrapper = input.closest('div[data-baseweb="input"]');
         if (wrapper) {
             if (input.value && input.value.trim() !== '') {
