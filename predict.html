@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="维修报告">
+    <title>维修报告生成工具</title>
+    <style>
+        /* --- 全局样式重置 --- */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #FFFFFF;
+            color: #000000;
+            margin: 0;
+            padding: 20px;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding-bottom: 50px;
+        }
+        h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        hr {
+            border: none;
+            border-top: 1px solid #d3d3d3;
+            margin: 20px 0;
+        }
+        
+        /* --- 标签与输入框样式 --- */
+        .section-title {
+            font-size: 15px;
+            font-weight: bold;
+            color: #154A7F;
+            margin-top: 20px;
+            margin-bottom: 8px;
+        }
+        .section-subtitle {
+            font-size: 12px;
+            color: #888888;
+            font-weight: normal;
+        }
+        
+        input, textarea {
+            width: 100%;
+            box-sizing: border-box;
+            font-size: 16px; 
+            padding: 12px;
+            border: 1px solid #cccccc !important;
+            border-radius: 8px;
+            background-color: #ffffff !important;
+            box-shadow: none !important;
+            appearance: none; 
+            -webkit-appearance: none;
+            transition: all 0.2s ease;
+            outline: none !important;
+        }
+        textarea {
+            height: 120px;
+            resize: none;
+        }
+
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+
+        /* --- 核心魔法：状态验证 --- */
+        .status-focus {
+            border: 1px solid #FF3B30 !important;
+            box-shadow: 0 0 0 1px #FF3B30 !important;
+            background-color: #FFF1F0 !important;
+        }
+        .status-valid {
+            border: 1px solid #4CAF50 !important;
+            box-shadow: 0 0 0 1px #4CAF50 !important;
+            background-color: #F4FBF4 !important;
+        }
+        .status-error {
+            border: 1px solid #FF3B30 !important;
+            box-shadow: 0 0 0 1px #FF3B30 !important;
+            background-color: #FFF1F0 !important;
+        }
+
+        /* --- 按钮样式 --- */
+        .btn-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        button {
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            display: block;
+            width: 200px;
+            transition: opacity 0.2s;
+        }
+        button:active {
+            opacity: 0.7;
+        }
+        .btn-primary {
+            background-color: #dcf5d0;
+            color: #000000;
+            font-weight: 900;
+            font-size: 22px;
+            height: 55px;
+        }
+        .btn-copy {
+            background-color: #f8cbcc;
+            color: #000000;
+            font-weight: bold;
+            font-size: 18px;
+            height: 50px;
+        }
+        .btn-secondary {
+            background-color: #f5f5f5;
+            color: #888888;
+            font-weight: bold;
+            font-size: 16px;
+            height: 45px;
+            border: 1px solid #dddddd;
+        }
+        
+        /* --- 预测按钮 --- */
+        .btn-predict {
+            background-color: #E8E2F8; 
+            color: #4A3082;
+            font-weight: bold;
+            font-size: 16px;
+            height: 45px;
+            width: 100%; 
+            margin-top: 15px;
+            border-radius: 8px;
+            border: 1px solid #D1C4E9;
+        }
+
+        /* --- 预测结果卡片 --- */
+        .prediction-card {
+            display: none;
+            background: linear-gradient(135deg, #F4F0FF 0%, #E8E2F8 100%);
+            border: 1px solid #D1C4E9;
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: 15px;
+            color: #4A3082;
+            box-shadow: 0 4px 12px rgba(74, 48, 130, 0.08);
+        }
+        .pred-title {
+            font-size: 16px;
+            font-weight: 900;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+        .pred-data-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 15px;
+        }
+        .pred-highlight {
+            font-size: 18px;
+            font-weight: 900;
+            color: #6200EE;
+        }
+        .pred-note {
+            font-size: 12px;
+            color: #7E6BC4;
+            margin-top: 10px;
+            text-align: right;
+        }
+
+        /* --- 结果显示区 --- */
+        #result-section { display: none; }
+        .report-display {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #000000;
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #eeeeee;
+        }
+        #hidden-copy-text {
+            position: absolute;
+            left: -9999px;
+            opacity: 0;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>维修报告生成工具 V2.0</h1>
+    <hr style="margin-top: -5px;">
+
+    <div class="section-title">截止时间</div>
+    <input type="text" inputmode="decimal" id="end_time" class="input-field" placeholder="例如: 22 或者 22:00" enterkeyhint="next">
+
+    <div class="section-title">今日已完成维修数量 <span class="section-subtitle">(用于生成报告)</span></div>
+    <input type="text" inputmode="decimal" id="qty" class="input-field" placeholder="请输入已完成数量" enterkeyhint="next">
+
+    <div class="section-title">维修工时排班</div>
+    <div id="hours-container">
+        <!-- JS 自动生成 -->
+    </div>
+
+    <!-- 新增：等待维修数量输入框 -->
+    <div class="section-title">当前等待维修数量 <span class="section-subtitle">(用于预测产能)</span></div>
+    <input type="text" inputmode="decimal" id="wait_qty" class="input-field" placeholder="目前积压排队的设备数" enterkeyhint="next">
+
+    <!-- 实时产能预测按钮与卡片 -->
+    <button class="btn-predict" onclick="predictCapacity()">📊 计算剩余产能预测</button>
+    
+    <div id="prediction-card" class="prediction-card">
+        <div class="pred-title">⏱️ 实时产能看板</div>
+        <div class="pred-data-row">
+            <span>从 <strong id="pred-time-start">16:00</strong> 剩余排班工时：</span>
+            <span><span id="pred-hours" class="pred-highlight">0</span> h</span>
+        </div>
+        <div class="pred-data-row">
+            <span>剩余工时总产能：</span>
+            <span><span id="pred-total-capacity" class="pred-highlight">0</span> 台</span>
+        </div>
+        <div class="pred-data-row">
+            <span>减去当前等待维修：</span>
+            <span><span id="pred-waiting" class="pred-highlight" style="color: #FF3B30;">0</span> 台</span>
+        </div>
+        <hr style="border-top: 1px dashed #D1C4E9; margin: 12px 0;">
+        <div class="pred-data-row" style="font-size: 18px; font-weight: bold;">
+            <span>✨ 还可以接入新单：</span>
+            <span><span id="pred-can-accept" class="pred-highlight" style="font-size: 24px;">0</span> 台</span>
+        </div>
+        <div class="pred-note" id="pred-warning">* 按单台耗时 40 分钟计算</div>
+    </div>
+
+    <div class="section-title">其他分享</div>
+    <textarea id="notes" class="input-field" placeholder="有什么想分享的吗？"></textarea>
+
+    <!-- 生成按钮 -->
+    <div class="btn-container">
+        <button class="btn-primary" onclick="generateReport()">生成报告</button>
+    </div>
+    
+    <div class="btn-container" style="margin-top: 15px;">
+        <button class="btn-secondary" onclick="clearData()">刷新页面</button>
+    </div>
+
+    <!-- 结果区 -->
+    <div id="result-section">
+        <hr>
+        <div id="report-output" class="report-display"></div>
+        <hr>
+        <textarea id="hidden-copy-text" readonly></textarea>
+        <div class="btn-container">
+            <button id="copy-btn" class="btn-copy" onclick="copyReport()">点击复制报告内容</button>
+        </div>
+        <div class="btn-container" style="margin-top: 15px;">
+            <button class="btn-secondary" onclick="clearData()">刷新页面</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. 初始化：生成 10 到 22 的工时输入框
+    const hoursContainer = document.getElementById('hours-container');
+    for (let i = 10; i <= 22; i++) {
+        let input = document.createElement('input');
+        input.type = 'text';
+        input.inputMode = 'decimal';
+        input.id = 'h' + i;
+        input.className = 'input-field';
+        input.setAttribute('enterkeyhint', 'next');
+        input.placeholder = i + ':00';
+        input.style.marginBottom = '10px';
+        hoursContainer.appendChild(input);
+    }
+
+    // 2. 状态验证逻辑
+    function checkInputStatus(el) {
+        let val = el.value.trim();
+        el.classList.remove('status-focus', 'status-valid', 'status-error');
+        if (val === '') {
+            if (document.activeElement === el) el.classList.add('status-focus');
+            return;
+        }
+        let isValid = false;
+        if (el.id === 'notes') isValid = true;
+        else if (el.id === 'end_time') isValid = /^[\d:：]+$/.test(val);
+        else isValid = /^\d*\.?\d+$/.test(val); // qty, wait_qty, 和工时都用数字验证
+
+        if (isValid) el.classList.add('status-valid');
+        else el.classList.add('status-error');
+    }
+
+    const allInputs = document.querySelectorAll('.input-field');
+    allInputs.forEach((input, index) => {
+        input.addEventListener('input', () => checkInputStatus(input));
+        input.addEventListener('focus', () => checkInputStatus(input));
+        input.addEventListener('blur', () => checkInputStatus(input));
+
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                if (this.tagName === 'INPUT') {
+                    e.preventDefault(); 
+                    if (index < allInputs.length - 1) allInputs[index + 1].focus(); 
+                    else this.blur(); 
+                }
+            }
+        });
+    });
+
+    // --- 核心更新：带积压计算的产能预测 ---
+    function predictCapacity() {
+        let currentHour = new Date().getHours();
+        
+        let startHour = currentHour;
+        if (startHour < 10) startHour = 10;
+        if (startHour > 22) startHour = 22;
+
+        let remainingHours = 0;
+        
+        // 累加剩余工时
+        for (let i = startHour; i <= 22; i++) {
+            let valStr = document.getElementById('h' + i).value.trim();
+            if (/^\d*\.?\d+$/.test(valStr)) {
+                remainingHours += parseFloat(valStr);
+            }
+        }
+
+        // 获取当前等待维修数量
+        let waitQtyStr = document.getElementById('wait_qty').value.trim();
+        let waitQty = /^\d*\.?\d+$/.test(waitQtyStr) ? parseInt(waitQtyStr, 10) : 0;
+
+        // 计算逻辑：总产能 = 剩余工时 / (40/60)
+        let totalCapacity = Math.floor(remainingHours / (40 / 60));
+        
+        // 还可以接单 = 总产能 - 等待数量
+        let canAccept = totalCapacity - waitQty;
+
+        // 更新 UI
+        document.getElementById('pred-time-start').innerText = startHour + ":00";
+        document.getElementById('pred-hours').innerText = remainingHours.toFixed(1);
+        document.getElementById('pred-total-capacity').innerText = totalCapacity;
+        document.getElementById('pred-waiting').innerText = waitQty;
+
+        let acceptEl = document.getElementById('pred-can-accept');
+        let warningEl = document.getElementById('pred-warning');
+
+        // 超负荷警告逻辑
+        if (canAccept < 0) {
+            acceptEl.innerText = "0";
+            acceptEl.style.color = "#FF3B30"; // 红色
+            warningEl.innerText = `⚠️ 警告：当前积压已超出剩余产能 ${Math.abs(canAccept)} 台！`;
+            warningEl.style.color = "#FF3B30";
+        } else {
+            acceptEl.innerText = canAccept;
+            acceptEl.style.color = "#6200EE"; // 恢复紫色
+            warningEl.innerText = "* 按单台耗时 40 分钟计算";
+            warningEl.style.color = "#7E6BC4";
+        }
+
+        let card = document.getElementById('prediction-card');
+        card.style.display = 'block';
+    }
+
+    // 3. 生成报告逻辑
+    function generateReport() {
+        let endTimeInput = document.getElementById('end_time');
+        let timeStr = endTimeInput.value.trim();
+        if (timeStr) {
+            if (/^\d+$/.test(timeStr)) timeStr += ":00";
+            timeStr = timeStr.replace("：", ":");
+        }
+
+        let totalHours = 0;
+        for (let i = 10; i <= 22; i++) {
+            let valStr = document.getElementById('h' + i).value.trim();
+            if (/^\d*\.?\d+$/.test(valStr)) {
+                totalHours += parseFloat(valStr);
+            }
+        }
+        
+        let qtyStr = document.getElementById('qty').value.trim();
+        let qty = /^\d*\.?\d+$/.test(qtyStr) ? parseInt(qtyStr, 10) : 0;
+        
+        let eff = totalHours > 0 ? (qty / totalHours) : 0;
+
+        let d = new Date();
+        let month = String(d.getMonth() + 1).padStart(2, '0');
+        let day = String(d.getDate()).padStart(2, '0');
+        let today = `${month}/${day}`;
+
+        let baseReport = `${today}\n\n截止时间：${timeStr}\n维修工时：${totalHours.toFixed(1)}\n维修效率：${eff.toFixed(2)}`;
+        let notes = document.getElementById('notes').value.trim();
+        let finalReport = notes ? `${baseReport}\n\n分享：\n${notes}` : baseReport;
+
+        document.getElementById('report-output').innerHTML = finalReport.replace(/\n/g, '<br>');
+        document.getElementById('hidden-copy-text').value = finalReport;
+        
+        let resultSection = document.getElementById('result-section');
+        resultSection.style.display = 'block';
+
+        setTimeout(() => {
+            resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+    }
+
+    // 4. 复制逻辑
+    function copyReport() {
+        let copyText = document.getElementById('hidden-copy-text');
+        copyText.select();
+        copyText.setSelectionRange(0, 99999); 
+        document.execCommand("copy");
+
+        let btn = document.getElementById('copy-btn');
+        let originalText = btn.innerText;
+        btn.innerText = "复制成功！";
+        btn.style.backgroundColor = "#dcf5d0"; 
+        
+        setTimeout(() => {
+            btn.innerText = originalText;
+            btn.style.backgroundColor = "#f8cbcc"; 
+        }, 2000);
+    }
+
+    // 5. 刷新/清空逻辑
+    function clearData() {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        setTimeout(() => {
+            allInputs.forEach(input => {
+                input.value = '';
+                checkInputStatus(input); 
+            });
+            document.getElementById('result-section').style.display = 'none';
+            document.getElementById('prediction-card').style.display = 'none';
+        }, 300); 
+    }
+</script>
+
+</body>
+</html>
