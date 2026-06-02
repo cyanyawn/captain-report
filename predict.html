@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="预计维修数量工具">
+    <meta name="apple-mobile-web-app-title" content="产能预测">
     <title>预计维修数量工具 V1.0</title>
     <style>
         /* --- 全局样式重置 --- */
@@ -110,7 +110,6 @@
             border: 1px solid #dddddd;
         }
         
-        /* --- 预测按钮 --- */
         .btn-predict {
             background-color: #E8E2F8; 
             color: #4A3082;
@@ -128,6 +127,41 @@
             box-shadow: 0 2px 4px rgba(74, 48, 130, 0.1);
         }
 
+        /* --- 新增：吸顶悬浮胶囊 --- */
+        .floating-bar {
+            display: none;
+            position: sticky;
+            top: 10px; /* 距离顶部一点点距离 */
+            z-index: 1000;
+            background: rgba(232, 226, 248, 0.95); /* 半透明紫色 */
+            backdrop-filter: blur(10px); /* 苹果经典的毛玻璃效果 */
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(209, 196, 233, 0.8);
+            border-radius: 16px;
+            padding: 12px 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 8px 20px rgba(74, 48, 130, 0.15);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .floating-bar:active {
+            transform: scale(0.98);
+        }
+        .float-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #4A3082;
+            font-weight: bold;
+            font-size: 15px;
+        }
+        .float-number {
+            font-size: 22px;
+            font-weight: 900;
+            color: #6200EE;
+            display: inline-block;
+        }
+
         /* --- 预测结果卡片 --- */
         .prediction-card {
             display: none;
@@ -138,7 +172,6 @@
             margin-top: 20px;
             color: #4A3082;
             box-shadow: 0 4px 12px rgba(74, 48, 130, 0.08);
-            transition: all 0.3s ease;
         }
         .pred-title {
             font-size: 16px;
@@ -169,11 +202,10 @@
             font-size: 15px;
         }
         .pred-highlight {
-            display: inline-block; /* 必须加这个才能让缩放动画生效 */
+            display: inline-block;
             font-size: 18px;
             font-weight: 900;
             color: #6200EE;
-            transition: color 0.3s ease;
         }
         .pred-note {
             font-size: 12px;
@@ -182,10 +214,10 @@
             text-align: right;
         }
 
-        /* --- 新增：数据更新时的弹跳动画 --- */
+        /* --- 数据更新时的弹跳动画 --- */
         @keyframes popUpdate {
             0% { transform: scale(1); }
-            40% { transform: scale(1.4); } /* 瞬间放大 1.4 倍 */
+            40% { transform: scale(1.4); } 
             100% { transform: scale(1); }
         }
         .update-flash {
@@ -199,9 +231,19 @@
     <h1>预计维修数量工具 V1.0</h1>
     <hr style="margin-top: -5px;">
 
-    <!-- 坚决使用 type="number" 保卫完美键盘 -->
+    <!-- 新增：吸顶悬浮胶囊 -->
+    <div id="floating-bar" class="floating-bar" onclick="scrollToCard()">
+        <div class="float-content">
+            <span style="display: flex; align-items: center;">
+                <span class="live-badge" style="margin-right: 10px; font-size: 10px;">LIVE</span>
+                ✨ 还可以接新单：
+            </span>
+            <span><span id="float-can-accept" class="float-number">0</span> 台</span>
+        </div>
+    </div>
+
     <div class="section-title">关店时间 <span class="section-subtitle">(支持半小时，如 22.5)</span></div>
-    <input type="number" id="close_time" class="input-field" placeholder="例如: 22.5 代表晚上10点半" enterkeyhint="next">
+    <input type="time" id="close_time" class="input-field status-valid" value="22:00">
 
     <div class="section-title">单台维修耗时 <span class="section-subtitle">(分钟/台)</span></div>
     <input type="number" id="efficiency" class="input-field status-valid" value="40" placeholder="例如: 40" enterkeyhint="next">
@@ -275,7 +317,14 @@
             if (document.activeElement === el) el.classList.add('status-focus');
             return;
         }
-        let isValid = /^\d*\.?\d+$/.test(val);
+        
+        let isValid = false;
+        if (el.type === 'time') {
+            isValid = /^[\d:]+$/.test(val); 
+        } else {
+            isValid = /^\d*\.?\d+$/.test(val); 
+        }
+
         if (isValid) el.classList.add('status-valid');
         else el.classList.add('status-error');
     }
@@ -307,17 +356,26 @@
         updateDashboard(false); 
     }
 
+    // 点击悬浮窗，自动滑到底部大看板
+    function scrollToCard() {
+        let card = document.getElementById('prediction-card');
+        if (card.style.display === 'block') {
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
     function updateDashboard(isSilentMode) {
-        let closeTimeStr = document.getElementById('close_time').value.trim();
-        let closeHour = parseFloat(closeTimeStr);
-        
-        if (isNaN(closeHour) || closeHour < 10 || closeHour > 24) {
+        let closeTimeStr = document.getElementById('close_time').value;
+        if (!closeTimeStr) {
             if (!isSilentMode) {
-                alert("请先在最上方填写正确的关店时间 (例如 22 或 22.5)！");
+                alert("请先在最上方选择关店时间！");
                 document.getElementById('close_time').focus();
             }
             return;
         }
+
+        let timeParts = closeTimeStr.split(':');
+        let closeHour = parseInt(timeParts[0], 10) + parseInt(timeParts[1], 10) / 60;
 
         let effStr = document.getElementById('efficiency').value.trim();
         let minsPerDevice = parseFloat(effStr);
@@ -359,38 +417,40 @@
         let closeMinDisplay = (closeHour % 1 === 0.5) ? "30" : "00";
 
         document.getElementById('pred-time-start').innerText = startHour + ":00";
-        document.getElementById('pred-time-end').innerText = closeHourDisplay + ":" + closeMinDisplay; 
+        document.getElementById('pred-time-end').innerText = closeTimeStr; 
         document.getElementById('pred-hours').innerText = remainingHours.toFixed(1);
         document.getElementById('pred-total-capacity').innerText = totalCapacity;
         document.getElementById('pred-waiting').innerText = waitQty;
         document.getElementById('pred-repairing').innerText = repairingQty;
 
         let acceptEl = document.getElementById('pred-can-accept');
+        let floatAcceptEl = document.getElementById('float-can-accept'); // 悬浮窗数字
         let warningEl = document.getElementById('pred-warning');
 
         if (canAccept < 0) {
             acceptEl.innerText = "0";
             acceptEl.style.color = "#FF3B30"; 
+            floatAcceptEl.innerText = "0";
+            floatAcceptEl.style.color = "#FF3B30"; 
             warningEl.innerText = `⚠️ 警告：当前任务已超出剩余产能 ${Math.abs(canAccept)} 台！`;
             warningEl.style.color = "#FF3B30";
         } else {
             acceptEl.innerText = canAccept;
             acceptEl.style.color = "#6200EE"; 
+            floatAcceptEl.innerText = canAccept;
+            floatAcceptEl.style.color = "#6200EE"; 
             warningEl.innerText = `* 按单台耗时 ${minsPerDevice} 分钟计算`;
             warningEl.style.color = "#7E6BC4";
         }
 
-        // --- 新增魔法：触发数字弹跳动画 ---
+        // 触发数字弹跳动画 (大看板 + 悬浮窗)
         if (isDashboardActive && isSilentMode) {
-            let flashIds = ['pred-hours', 'pred-total-capacity', 'pred-waiting', 'pred-repairing', 'pred-can-accept'];
+            let flashIds = ['pred-hours', 'pred-total-capacity', 'pred-waiting', 'pred-repairing', 'pred-can-accept', 'float-can-accept'];
             flashIds.forEach(id => {
                 let el = document.getElementById(id);
                 if (el) {
-                    // 先移除旧的动画类
                     el.classList.remove('update-flash');
-                    // 强制浏览器重新渲染 (Reflow)，这是重启 CSS 动画的关键黑科技
                     void el.offsetWidth; 
-                    // 重新加上动画类
                     el.classList.add('update-flash');
                 }
             });
@@ -398,7 +458,10 @@
 
         if (!isDashboardActive) {
             let card = document.getElementById('prediction-card');
+            let floatBar = document.getElementById('floating-bar');
+            
             card.style.display = 'block';
+            floatBar.style.display = 'block'; // 显示悬浮窗
             isDashboardActive = true;
             
             setTimeout(() => {
@@ -412,12 +475,13 @@
         setTimeout(() => {
             const allInputs = document.querySelectorAll('.input-field');
             allInputs.forEach(input => {
-                if (input.id !== 'efficiency') {
+                if (input.id !== 'efficiency' && input.id !== 'close_time') {
                     input.value = '';
                     checkInputStatus(input); 
                 }
             });
             document.getElementById('prediction-card').style.display = 'none';
+            document.getElementById('floating-bar').style.display = 'none'; // 隐藏悬浮窗
             isDashboardActive = false; 
         }, 300); 
     }
