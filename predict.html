@@ -169,6 +169,7 @@
             font-size: 15px;
         }
         .pred-highlight {
+            display: inline-block; /* 必须加这个才能让缩放动画生效 */
             font-size: 18px;
             font-weight: 900;
             color: #6200EE;
@@ -179,6 +180,16 @@
             color: #7E6BC4;
             margin-top: 10px;
             text-align: right;
+        }
+
+        /* --- 新增：数据更新时的弹跳动画 --- */
+        @keyframes popUpdate {
+            0% { transform: scale(1); }
+            40% { transform: scale(1.4); } /* 瞬间放大 1.4 倍 */
+            100% { transform: scale(1); }
+        }
+        .update-flash {
+            animation: popUpdate 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
     </style>
 </head>
@@ -243,11 +254,9 @@
 </div>
 
 <script>
-    // 1. 初始化：生成 10 到 22 的工时输入框
     const hoursContainer = document.getElementById('hours-container');
     for (let i = 10; i <= 22; i++) {
         let input = document.createElement('input');
-        // 坚决使用 type="number" 保卫完美键盘
         input.type = 'number';
         input.id = 'h' + i;
         input.className = 'input-field';
@@ -259,7 +268,6 @@
 
     let isDashboardActive = false;
 
-    // 2. 状态验证逻辑
     function checkInputStatus(el) {
         let val = el.value.trim();
         el.classList.remove('status-focus', 'status-valid', 'status-error');
@@ -295,7 +303,6 @@
         });
     });
 
-    // --- 核心逻辑 ---
     function activateDashboard() {
         updateDashboard(false); 
     }
@@ -371,6 +378,22 @@
             acceptEl.style.color = "#6200EE"; 
             warningEl.innerText = `* 按单台耗时 ${minsPerDevice} 分钟计算`;
             warningEl.style.color = "#7E6BC4";
+        }
+
+        // --- 新增魔法：触发数字弹跳动画 ---
+        if (isDashboardActive && isSilentMode) {
+            let flashIds = ['pred-hours', 'pred-total-capacity', 'pred-waiting', 'pred-repairing', 'pred-can-accept'];
+            flashIds.forEach(id => {
+                let el = document.getElementById(id);
+                if (el) {
+                    // 先移除旧的动画类
+                    el.classList.remove('update-flash');
+                    // 强制浏览器重新渲染 (Reflow)，这是重启 CSS 动画的关键黑科技
+                    void el.offsetWidth; 
+                    // 重新加上动画类
+                    el.classList.add('update-flash');
+                }
+            });
         }
 
         if (!isDashboardActive) {
