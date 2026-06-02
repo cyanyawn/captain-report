@@ -139,28 +139,33 @@ def calc_val(v):
     return float(v) if v is not None else 0.0
 
 # -----------------------------------------
-# 5. 原生 HTML 密码验证系统 (触发 iCloud 钥匙串)
+# 5. 终极稳定版：原生 HTML 密码验证系统
 # -----------------------------------------
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
 
-# 接收 JS 传来的密码
-auth_signal = st.text_input("auth_signal", key="auth_signal", label_visibility="collapsed", disabled=True)
-if auth_signal == '1984':
+# 检查 URL 通行证
+if st.query_params.get("auth") == "passed":
     st.session_state.authenticated = True
 
-# 强制隐藏这个信号输入框
-st.markdown("""<style>div[data-testid="stTextInput"]:has(input[aria-label="auth_signal"]) {display: none !important;}</style>""", unsafe_allow_html=True)
+# 检查本地缓存，如果有密码，自动加上 URL 通行证刷新
+auth_check_js = """
+<script>
+    if (window.parent.localStorage.getItem('captain_auth') === '1984') {
+        if (!window.parent.location.search.includes('auth=passed')) {
+            window.parent.location.search = '?auth=passed';
+        }
+    }
+</script>
+"""
+components.html(auth_check_js, height=0)
 
 if not st.session_state.authenticated:
-    # 使用纯正的 HTML form 来骗过 Safari 的密码管理器
     login_html = """
     <div style="text-align: center; margin-top: 80px; font-family: -apple-system, sans-serif;">
         <h2 style="color: #154A7F; margin-bottom: 30px;">🔒 请输入访问口令</h2>
-        <form id="loginForm" onsubmit="submitForm(event)">
-            <!-- 必须有一个 username 字段，Safari 才会认为这是个完整的登录表单 -->
+        <form onsubmit="submitForm(event)">
             <input type="text" name="username" value="TeamMember" style="display:none;" autocomplete="username">
-            
             <input type="password" id="pwdInput" name="password" autocomplete="current-password" placeholder="请输入口令" 
                    style="width: 80%; max-width: 300px; padding: 15px; font-size: 18px; border: 1px solid #ccc; border-radius: 8px; margin-bottom: 20px; outline: none;">
             <br>
@@ -174,18 +179,16 @@ if not st.session_state.authenticated:
     
     <script>
         function submitForm(event) {
-            event.preventDefault(); // 阻止表单默认的跳转行为
-            var pwd = document.getElementById('pwdInput').value;
+            event.preventDefault(); 
+            // 自动去除输入框前后的空格，防止误触报错
+            var pwd = document.getElementById('pwdInput').value.trim();
             
             if (pwd === '1984') {
-                // 密码正确，把密码传给隐藏的 Streamlit 输入框
-                var hiddenInput = window.parent.document.getElementById('auth_signal');
-                if (hiddenInput) {
-                    hiddenInput.value = '1984';
-                    hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
-                }
+                // 密码正确，存入缓存并刷新页面带上通行证
+                window.parent.localStorage.setItem('captain_auth', '1984');
+                window.parent.location.search = '?auth=passed';
             } else {
-                // 密码错误，显示提示
+                // 密码错误
                 document.getElementById('errorMsg').style.display = 'block';
                 document.getElementById('pwdInput').value = '';
                 document.getElementById('pwdInput').focus();
@@ -203,7 +206,7 @@ st.markdown("<h1>预计维修数量工具 V1.0</h1>", unsafe_allow_html=True)
 st.markdown("<hr style='margin-top: -10px; border-top: 1px solid #d3d3d3;'>", unsafe_allow_html=True)
 
 # -----------------------------------------
-# 7. 表单输入区 (坚决使用 number_input 保护键盘)
+# 7. 表单输入区
 # -----------------------------------------
 st.markdown("更新人 <span class='subtitle'>(你的名字/昵称)</span>", unsafe_allow_html=True)
 updater_name = st.text_input("updater", value=shared_data["updater_name"], label_visibility="collapsed", placeholder="例如: Ice")
