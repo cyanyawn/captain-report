@@ -46,6 +46,20 @@ st.markdown("""
         opacity: 0.8 !important;
     }
 
+    button[kind="secondary"] {
+        background-color: #f5f5f5 !important;
+        color: #888888 !important;
+        font-weight: bold !important;
+        font-size: 16px !important;
+        border: 1px solid #dddddd !important;
+        border-radius: 8px !important;
+        width: 200px !important;
+        height: 45px !important;
+        margin: 10px auto 0 auto !important;
+        display: block !important;
+    }
+    button[kind="secondary"]:hover { background-color: #e8e8e8 !important; color: #333333 !important; }
+
     .prediction-card {
         background: linear-gradient(135deg, #F4F0FF 0%, #E8E2F8 100%);
         border: 1px solid #D1C4E9;
@@ -84,30 +98,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------
-# 3. 核心架构：全队共享数据
-# -----------------------------------------
-@st.cache_resource
-def get_shared_data():
-    return {
-        "is_active": False,
-        "close_time": "22",
-        "efficiency": "40",
-        "wait_qty": "",
-        "repairing_qty": "",
-        "hours": {h: "" for h in range(10, 23)},
-        "updater_name": "",
-        "update_time": ""
-    }
-
-shared_data = get_shared_data()
-
-def safe_float(val, default=0.0):
-    if not val: return default
-    try: return float(val)
-    except ValueError: return default
-
-# -----------------------------------------
-# 4. 极简密码验证系统 (带 LocalStorage 记忆)
+# 3. 极简密码验证系统 (带 LocalStorage 记忆)
 # -----------------------------------------
 auth_check_js = """
 <script>
@@ -149,15 +140,34 @@ if not st.session_state.authenticated:
     st.stop() 
 
 # -----------------------------------------
-# 5. 标题区
+# 4. 核心架构：全队共享数据
 # -----------------------------------------
+@st.cache_resource
+def get_shared_data():
+    return {
+        "is_active": False,
+        "close_time": "22",
+        "efficiency": "40",
+        "wait_qty": "",
+        "repairing_qty": "",
+        "hours": {h: "" for h in range(10, 23)},
+        "updater_name": "",
+        "update_time": ""
+    }
+
+shared_data = get_shared_data()
+
+def safe_float(val, default=0.0):
+    if not val: return default
+    try: return float(val)
+    except ValueError: return default
+
+# 5. 标题区
 st.markdown("<h1>预计维修数量工具 V1.0</h1>", unsafe_allow_html=True)
 st.markdown("<hr style='margin-top: -10px; border-top: 1px solid #d3d3d3;'>", unsafe_allow_html=True)
 
-# -----------------------------------------
 # 6. 表单输入区
-# -----------------------------------------
-st.markdown("当前排班人 <span class='subtitle'>(你的名字/昵称)</span>", unsafe_allow_html=True)
+st.markdown("更新人 <span class='subtitle'>(你的名字/昵称)</span>", unsafe_allow_html=True)
 updater_name = st.text_input("updater", value=shared_data["updater_name"], label_visibility="collapsed", placeholder="例如: Ice")
 
 st.markdown("关店时间 <span class='subtitle'>(支持半小时，如 22.5)</span>", unsafe_allow_html=True)
@@ -184,7 +194,7 @@ with col2:
 
 if generate_clicked:
     if not updater_name.strip():
-        st.warning("请在最上方填写当前排班人姓名！")
+        st.warning("请在最上方填写更新人姓名！")
     else:
         bj_time = datetime.datetime.utcnow() + datetime.timedelta(hours=8)
         
@@ -266,7 +276,7 @@ if shared_data["is_active"]:
     """
     st.markdown(card_html, unsafe_allow_html=True)
 
-# 9. 注入全局前端魔法脚本 (强制数字键盘 + 回车跳跃)
+# 9. 注入全局前端魔法脚本 (精确锁定数字全键盘 + 回车跳跃)
 magic_js = """
 <script>
 const doc = window.parent.document;
@@ -281,14 +291,26 @@ function enhanceInputs() {
     const inputs = Array.from(doc.querySelectorAll('input:not([type="hidden"]), textarea'));
     
     inputs.forEach((input, index) => {
-        input.removeAttribute('inputmode');
+        // --- 终极键盘精准锁定魔法 ---
+        // 通过 aria-label (我们在 Python 里设定的隐形标签) 来精准判断
+        let label = input.getAttribute('aria-label');
         
+        // 如果是“更新人”或者隐藏的密码信号框，使用普通全键盘
+        if (label === 'updater' || label === 'auth_signal') {
+            input.removeAttribute('inputmode');
+        } else {
+            // 其他所有的框（时间、数量、工时），强制使用带小数点的数字全键盘！
+            input.setAttribute('inputmode', 'decimal');
+        }
+        
+        // 设置 Next 键连点逻辑
         if (index < inputs.length - 1) {
             input.setAttribute('enterkeyhint', 'next');
         } else {
             input.setAttribute('enterkeyhint', 'done');
         }
 
+        // 绿框微交互
         const wrapper = input.closest('div[data-baseweb="input"]');
         if (wrapper) {
             if (input.value && input.value.trim() !== '') {
