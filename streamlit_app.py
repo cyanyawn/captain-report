@@ -112,7 +112,7 @@ def get_bj_time():
 @st.cache_resource
 def get_shared_data():
     return {
-        "date": get_bj_time().date(), # 记录数据是哪天的
+        "date": get_bj_time().date(), 
         "is_active": False,
         "close_time": 22.0,
         "efficiency": 40.0,
@@ -125,10 +125,8 @@ def get_shared_data():
 
 shared_data = get_shared_data()
 
-# 【午夜自动清空逻辑】
 today_date = get_bj_time().date()
 if shared_data["date"] < today_date:
-    # 到了新的一天，自动清空排班数据，但保留关店时间和效率设置
     shared_data["date"] = today_date
     shared_data["is_active"] = False
     shared_data["wait_qty"] = None
@@ -190,10 +188,9 @@ st.markdown("<h1>预计维修数量工具 V1.0</h1>", unsafe_allow_html=True)
 st.markdown("<hr style='margin-top: -10px; border-top: 1px solid #d3d3d3;'>", unsafe_allow_html=True)
 
 # -----------------------------------------
-# 7. 表单输入区 (核心修复：全部改回 number_input 唤起完美键盘)
+# 7. 表单输入区 (坚决使用 number_input 保护键盘)
 # -----------------------------------------
 st.markdown("更新人 <span class='subtitle'>(你的名字/昵称)</span>", unsafe_allow_html=True)
-# 名字用 text_input，调出字母键盘
 updater_name = st.text_input("updater", value=shared_data["updater_name"], label_visibility="collapsed", placeholder="例如: Ice")
 
 st.markdown("关店时间 <span class='subtitle'>(支持半小时，如 22.5)</span>", unsafe_allow_html=True)
@@ -202,8 +199,8 @@ close_time_input = st.number_input("close_time", value=shared_data["close_time"]
 st.markdown("维修工时排班 <span class='subtitle'>(随时可加减修改)</span>", unsafe_allow_html=True)
 hours_input = {}
 for h in range(10, 23):
-    # 用 number_input + value=None，完美实现空框 + 完美数字键盘
-    hours_input[h] = st.number_input(f"{h}:00", value=shared_data["hours"][h], min_value=0.0, step=1.0, label_visibility="collapsed")
+    # 给每个框加上特定的 aria-label，方便底层 JS 找到它们并注入 placeholder
+    hours_input[h] = st.number_input(f"hour_{h}", value=shared_data["hours"][h], min_value=0.0, step=1.0, label_visibility="collapsed")
 
 st.markdown("当前等待维修数量 <span class='subtitle'>(积压排队的设备数)</span>", unsafe_allow_html=True)
 wait_qty_input = st.number_input("wait_qty", value=shared_data["wait_qty"], min_value=0.0, step=1.0, label_visibility="collapsed")
@@ -318,7 +315,7 @@ with col_clear2:
         clear_data()
         st.rerun()
 
-# 11. 注入全局前端魔法脚本 (去除了所有键盘干扰，只保留 Next 连点和绿框)
+# 11. 注入全局前端魔法脚本 (强制注入 Placeholder + Next 连点)
 magic_js = """
 <script>
 const doc = window.parent.document;
@@ -333,14 +330,25 @@ function enhanceInputs() {
     const inputs = Array.from(doc.querySelectorAll('input:not([type="hidden"]), textarea'));
     
     inputs.forEach((input, index) => {
-        // 绝对不改键盘类型，原汁原味保留 Streamlit 的 number_input 键盘！
+        // --- 核心修复：强行注入灰色的 Placeholder 提示 ---
+        let label = input.getAttribute('aria-label');
+        if (label && label.startsWith('hour_')) {
+            let hour = label.split('_')[1];
+            input.setAttribute('placeholder', hour + ':00');
+        } else if (label === 'wait_qty') {
+            input.setAttribute('placeholder', '请输入等待数量');
+        } else if (label === 'repairing_qty') {
+            input.setAttribute('placeholder', '请输入正在维修数量');
+        }
         
+        // 保留 Next 连点
         if (index < inputs.length - 1) {
             input.setAttribute('enterkeyhint', 'next');
         } else {
             input.setAttribute('enterkeyhint', 'done');
         }
 
+        // 绿框微交互
         const wrapper = input.closest('div[data-baseweb="input"]');
         if (wrapper) {
             if (input.value && input.value.trim() !== '') {
