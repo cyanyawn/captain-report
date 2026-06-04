@@ -154,7 +154,7 @@
     <div class="section-title">维修数量</div>
     <input type="text" inputmode="decimal" id="qty" class="input-field" placeholder="请输入数量" enterkeyhint="next">
 
-    <!-- 核心修改：去掉副标题，更新 placeholder -->
+    <!-- 已计算工时 -->
     <div class="section-title">已计算工时</div>
     <input type="text" inputmode="decimal" id="carried_hours" class="input-field" placeholder="可输入当天群里已计算工时" enterkeyhint="next">
 
@@ -262,9 +262,11 @@
             }
         }
         
+        // 获取维修数量
         let qtyStr = document.getElementById('qty').value.trim();
         let qty = /^\d*\.?\d+$/.test(qtyStr) ? parseInt(qtyStr, 10) : 0;
         
+        // 计算效率
         let eff = totalHours > 0 ? (qty / totalHours) : 0;
 
         // 获取日期 (格式 05/31)
@@ -273,8 +275,10 @@
         let day = String(d.getDate()).padStart(2, '0');
         let today = `${month}/${day}`;
 
-        // 组装文本
-        let baseReport = `${today}\n\n截止时间：${timeStr}\n维修工时：${totalHours.toFixed(1)}\n维修效率：${eff.toFixed(2)}`;
+        // --- 核心修复：把维修数量加回报告模板里 ---
+        // 格式：日期 -> 截止时间 -> 维修数量 -> 维修工时 -> 维修效率
+        let baseReport = `${today}\n\n截止时间：${timeStr}\n维修数量：${qty}\n维修工时：${totalHours.toFixed(1)}\n维修效率：${eff.toFixed(2)}`;
+        
         let notes = document.getElementById('notes').value.trim();
         let finalReport = notes ? `${baseReport}\n\n分享：\n${notes}` : baseReport;
 
