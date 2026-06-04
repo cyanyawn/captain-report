@@ -144,7 +144,6 @@
 <body>
 
 <div class="container">
-    <!-- 标题升级为 V2.0 -->
     <h1>维修报告生成工具 V2.0</h1>
     <hr style="margin-top: -5px;">
 
@@ -155,8 +154,9 @@
     <div class="section-title">维修数量</div>
     <input type="text" inputmode="decimal" id="qty" class="input-field" placeholder="请输入数量" enterkeyhint="next">
 
-    <div class="section-title">已计算工时 <span class="section-subtitle">(接班时填入早班累计工时)</span></div>
-    <input type="text" inputmode="decimal" id="carried_hours" class="input-field" placeholder="如果是接班，请输入之前算好的工时" enterkeyhint="next">
+    <!-- 核心修改：去掉副标题，更新 placeholder -->
+    <div class="section-title">已计算工时</div>
+    <input type="text" inputmode="decimal" id="carried_hours" class="input-field" placeholder="可输入当天群里已计算工时" enterkeyhint="next">
 
     <div class="section-title">维修工时排班</div>
     <div id="hours-container">
@@ -190,6 +190,7 @@
 </div>
 
 <script>
+    // 1. 初始化：生成 10 到 22 的工时输入框
     const hoursContainer = document.getElementById('hours-container');
     for (let i = 10; i <= 22; i++) {
         let input = document.createElement('input');
@@ -203,8 +204,10 @@
         hoursContainer.appendChild(input);
     }
 
+    // 2. 魔法：监听所有输入框，变绿 + 回车跳跃
     const allInputs = document.querySelectorAll('.input-field');
     allInputs.forEach((input, index) => {
+        // 变绿逻辑
         input.addEventListener('input', function() {
             if (this.value.trim() !== '') {
                 this.classList.add('is-filled');
@@ -213,6 +216,7 @@
             }
         });
 
+        // 回车跳跃逻辑
         input.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
                 if (this.tagName === 'INPUT') {
@@ -227,7 +231,9 @@
         });
     });
 
+    // 3. 生成报告逻辑
     function generateReport() {
+        // 处理时间格式
         let endTimeInput = document.getElementById('end_time');
         let timeStr = endTimeInput.value.trim();
         if (timeStr) {
@@ -239,13 +245,16 @@
             endTimeInput.classList.add('is-filled');
         }
 
+        // 计算工时
         let totalHours = 0;
         
+        // 加上“已计算工时”
         let carriedStr = document.getElementById('carried_hours').value.trim();
         if (/^\d*\.?\d+$/.test(carriedStr)) {
             totalHours += parseFloat(carriedStr);
         }
 
+        // 再加上各个时间段的工时
         for (let i = 10; i <= 22; i++) {
             let valStr = document.getElementById('h' + i).value.trim();
             if (/^\d*\.?\d+$/.test(valStr)) {
@@ -258,26 +267,31 @@
         
         let eff = totalHours > 0 ? (qty / totalHours) : 0;
 
+        // 获取日期 (格式 05/31)
         let d = new Date();
         let month = String(d.getMonth() + 1).padStart(2, '0');
         let day = String(d.getDate()).padStart(2, '0');
         let today = `${month}/${day}`;
 
+        // 组装文本
         let baseReport = `${today}\n\n截止时间：${timeStr}\n维修工时：${totalHours.toFixed(1)}\n维修效率：${eff.toFixed(2)}`;
         let notes = document.getElementById('notes').value.trim();
         let finalReport = notes ? `${baseReport}\n\n分享：\n${notes}` : baseReport;
 
+        // 显示结果
         document.getElementById('report-output').innerHTML = finalReport.replace(/\n/g, '<br>');
         document.getElementById('hidden-copy-text').value = finalReport;
         
         let resultSection = document.getElementById('result-section');
         resultSection.style.display = 'block';
 
+        // 丝滑滚动到结果区
         setTimeout(() => {
             resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 100);
     }
 
+    // 4. 复制逻辑
     function copyReport() {
         let copyText = document.getElementById('hidden-copy-text');
         copyText.select();
@@ -295,6 +309,7 @@
         }, 2000);
     }
 
+    // 5. 刷新/清空逻辑
     function clearData() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
         setTimeout(() => {
