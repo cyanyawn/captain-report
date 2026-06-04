@@ -165,7 +165,7 @@ st.markdown("<h1>预计维修数量工具 V1.0</h1>", unsafe_allow_html=True)
 st.markdown("<hr style='margin-top: -10px; border-top: 1px solid #d3d3d3;'>", unsafe_allow_html=True)
 
 # -----------------------------------------
-# 7. 表单输入区 (坚决使用 number_input 保护键盘)
+# 7. 表单输入区
 # -----------------------------------------
 st.markdown("更新人 <span class='subtitle'>(你的名字/昵称)</span>", unsafe_allow_html=True)
 updater_name = st.text_input("updater", value=shared_data["updater_name"], label_visibility="collapsed", placeholder="例如: Ice")
@@ -218,24 +218,58 @@ if shared_data["is_active"]:
     mins_per_device = shared_data["efficiency"]
     if mins_per_device <= 0: mins_per_device = 40.0 
     
-    current_hour = get_bj_time().hour
-    start_hour = max(10, current_hour)
+    # --- 核心魔法：时间等比例扣减算法 ---
+    now = get_bj_time()
+    curr_h = now.hour
+    curr_m = now.minute
+    now_mins = curr_h * 60 + curr_m
+    close_mins = int(close_hour * 60)
+    
+    # 格式化结束时间
+    close_hour_display = int(close_hour)
+    close_min_display = "30" if close_hour % 1 == 0.5 else "00"
+    end_time_str = f"{close_hour_display}:{close_min_display}"
+    
+    # 决定显示的开始时间
+    if now_mins < 10 * 60:
+        start_time_str = "10:00"
+    elif now_mins >= close_mins:
+        start_time_str = end_time_str
+    else:
+        start_time_str = f"{curr_h:02d}:{curr_m:02d}"
     
     remaining_hours = 0.0
-    if start_hour < close_hour:
-        max_box_hour = min(22, int(close_hour))
-        for i in range(start_hour, max_box_hour + 1):
-            remaining_hours += calc_val(shared_data["hours"][i])
+    
+    # 精确计算每个小时块的剩余比例
+    for i in range(10, 23):
+        if i >= close_hour:
+            continue
+            
+        block_start_mins = i * 60
+        block_end_mins = int(min(i + 1, close_hour) * 60)
+        block_total_mins = block_end_mins - block_start_mins
+        
+        if block_total_mins <= 0:
+            continue
+            
+        # 计算当前这个块还剩多少分钟
+        if now_mins >= block_end_mins:
+            left_mins = 0
+        elif now_mins <= block_start_mins:
+            left_mins = block_total_mins
+        else:
+            left_mins = block_end_mins - now_mins
+            
+        # 计算剩余比例并累加
+        ratio = left_mins / block_total_mins
+        val = calc_val(shared_data["hours"][i])
+        remaining_hours += val * ratio
             
     wait_qty = int(calc_val(shared_data["wait_qty"]))
     repairing_qty = int(calc_val(shared_data["repairing_qty"]))
     
     total_capacity = int(remaining_hours / (mins_per_device / 60))
     can_accept = total_capacity - wait_qty - repairing_qty
-    
-    close_hour_display = int(close_hour)
-    close_min_display = "30" if close_hour % 1 == 0.5 else "00"
-    end_time_str = f"{close_hour_display}:{close_min_display}"
     
     accept_color = "#FF3B30" if can_accept < 0 else "#6200EE"
     accept_display = 0 if can_accept < 0 else can_accept
@@ -249,7 +283,7 @@ if shared_data["is_active"]:
             <span style="font-size: 12px; color: #7E6BC4; font-weight: normal;">上次更新: {shared_data['updater_name']} @ {shared_data['update_time']}</span>
         </div>
         <div class="pred-data-row">
-            <span>从 <strong>{start_hour}:00</strong> 到 <strong>{end_time_str}</strong> 剩余工时：</span>
+            <span>从 <strong>{start_time_str}</strong> 到 <strong>{end_time_str}</strong> 剩余工时：</span>
             <span><span class="pred-highlight">{remaining_hours:.1f}</span> h</span>
         </div>
         <div class="pred-data-row">
@@ -288,7 +322,6 @@ st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
 col_btn1, col_btn2 = st.columns(2)
 with col_btn1:
     if st.button("刷新数据", type="secondary"):
-        # st.rerun() 会重新运行代码，拉取最新的 shared_data，但不会触发浏览器刷新
         st.toast("🔄 数据已更新至最新！")
         st.rerun()
 with col_btn2:
