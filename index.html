@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="维修报告">
-    <title>维修报告生成工具</title>
+    <title>维修报告生成工具 V2.0</title>
     <style>
         /* --- 全局样式重置 --- */
         body {
@@ -40,84 +40,151 @@
             margin-top: 20px;
             margin-bottom: 8px;
         }
+        .section-subtitle {
+            font-size: 12px;
+            color: #888888;
+            font-weight: normal;
+        }
         
         input, textarea {
             width: 100%;
             box-sizing: border-box;
             font-size: 16px; 
             padding: 12px;
-            border: 1px solid #cccccc !important;
+            border: 1px solid #cccccc;
             border-radius: 8px;
-            background-color: #ffffff !important;
-            box-shadow: none !important;
+            background-color: #ffffff;
             appearance: none; 
             -webkit-appearance: none;
             transition: all 0.2s ease;
-            outline: none !important;
         }
         textarea {
             height: 120px;
             resize: none;
         }
-
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 1px #4CAF50;
+        }
+        
         input[type=number]::-webkit-inner-spin-button, 
         input[type=number]::-webkit-outer-spin-button { 
             -webkit-appearance: none; 
             margin: 0; 
         }
 
-        .status-focus { border: 1px solid #FF3B30 !important; box-shadow: 0 0 0 1px #FF3B30 !important; background-color: #FFF1F0 !important; }
-        .status-valid { border: 1px solid #4CAF50 !important; box-shadow: 0 0 0 1px #4CAF50 !important; background-color: #F4FBF4 !important; }
-        .status-error { border: 1px solid #FF3B30 !important; box-shadow: 0 0 0 1px #FF3B30 !important; background-color: #FFF1F0 !important; }
+        /* --- 魔法：填入内容后的绿色状态 --- */
+        .is-filled {
+            border-color: #4CAF50 !important;
+            border-width: 2px !important;
+            background-color: #F4FBF4 !important;
+        }
 
-        .btn-container { display: flex; justify-content: center; margin-top: 20px; }
-        button { border: none; border-radius: 8px; cursor: pointer; display: block; width: 200px; transition: opacity 0.2s; }
-        button:active { opacity: 0.7; }
-        .btn-primary { background-color: #dcf5d0; color: #000000; font-weight: 900; font-size: 22px; height: 55px; }
-        .btn-copy { background-color: #f8cbcc; color: #000000; font-weight: bold; font-size: 18px; height: 50px; }
-        .btn-secondary { background-color: #f5f5f5; color: #888888; font-weight: bold; font-size: 16px; height: 45px; border: 1px solid #dddddd; }
+        /* --- 按钮样式 --- */
+        .btn-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        button {
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            display: block;
+            width: 200px;
+            transition: opacity 0.2s;
+        }
+        button:active {
+            opacity: 0.7;
+        }
+        .btn-primary {
+            background-color: #dcf5d0;
+            color: #000000;
+            font-weight: 900;
+            font-size: 22px;
+            height: 55px;
+        }
+        .btn-copy {
+            background-color: #f8cbcc;
+            color: #000000;
+            font-weight: bold;
+            font-size: 18px;
+            height: 50px;
+        }
+        .btn-secondary {
+            background-color: #f5f5f5;
+            color: #888888;
+            font-weight: bold;
+            font-size: 16px;
+            height: 45px;
+            border: 1px solid #dddddd;
+        }
 
-        #result-section { display: none; }
-        .report-display { font-size: 14px; line-height: 1.6; color: #000000; background-color: #f9f9f9; padding: 15px; border-radius: 8px; border: 1px solid #eeeeee; }
-        #hidden-copy-text { position: absolute; left: -9999px; opacity: 0; }
+        /* --- 结果显示区 --- */
+        #result-section {
+            display: none;
+        }
+        .report-display {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #000000;
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #eeeeee;
+        }
+        #hidden-copy-text {
+            position: absolute;
+            left: -9999px;
+            opacity: 0;
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>维修报告生成工具 V1.0</h1>
+    <!-- 标题升级为 V2.0 -->
+    <h1>维修报告生成工具 V2.0</h1>
     <hr style="margin-top: -5px;">
 
+    <!-- 表单区 -->
     <div class="section-title">截止时间</div>
-    <input type="number" id="end_time" class="input-field" placeholder="例如: 22 或者 22:00" enterkeyhint="next">
+    <input type="text" id="end_time" class="input-field" placeholder="例如: 22 或 22:00" enterkeyhint="next">
 
     <div class="section-title">维修数量</div>
-    <input type="number" id="qty" class="input-field" placeholder="请输入数量" enterkeyhint="next">
+    <input type="text" inputmode="decimal" id="qty" class="input-field" placeholder="请输入数量" enterkeyhint="next">
 
-    <div class="section-title">维修工时</div>
-    <div id="hours-container"></div>
+    <div class="section-title">已计算工时 <span class="section-subtitle">(接班时填入早班累计工时)</span></div>
+    <input type="text" inputmode="decimal" id="carried_hours" class="input-field" placeholder="如果是接班，请输入之前算好的工时" enterkeyhint="next">
+
+    <div class="section-title">维修工时排班</div>
+    <div id="hours-container">
+        <!-- JS 自动生成 -->
+    </div>
 
     <div class="section-title">其他分享</div>
     <textarea id="notes" class="input-field" placeholder="有什么想分享的吗？"></textarea>
 
+    <!-- 生成按钮 -->
     <div class="btn-container">
         <button class="btn-primary" onclick="generateReport()">生成报告</button>
     </div>
-    
-    <div class="btn-container" style="margin-top: 15px;">
-        <button class="btn-secondary" onclick="clearData()">刷新页面</button>
-    </div>
 
+    <!-- 结果区 -->
     <div id="result-section">
         <hr>
         <div id="report-output" class="report-display"></div>
         <hr>
+        
         <textarea id="hidden-copy-text" readonly></textarea>
+        
         <div class="btn-container">
             <button id="copy-btn" class="btn-copy" onclick="copyReport()">点击复制报告内容</button>
         </div>
+        
         <div class="btn-container" style="margin-top: 15px;">
-            <button class="btn-secondary" onclick="clearData()">刷新页面</button>
+            <button class="btn-secondary" onclick="clearData()">刷新页面重置</button>
         </div>
     </div>
 </div>
@@ -126,7 +193,8 @@
     const hoursContainer = document.getElementById('hours-container');
     for (let i = 10; i <= 22; i++) {
         let input = document.createElement('input');
-        input.type = 'number';
+        input.type = 'text';
+        input.inputMode = 'decimal';
         input.id = 'h' + i;
         input.className = 'input-field';
         input.setAttribute('enterkeyhint', 'next');
@@ -135,70 +203,109 @@
         hoursContainer.appendChild(input);
     }
 
-    function checkInputStatus(el) {
-        let val = el.value.trim();
-        el.classList.remove('status-focus', 'status-valid', 'status-error');
-        if (val === '') {
-            if (document.activeElement === el) el.classList.add('status-focus');
-            return;
-        }
-        let isValid = (el.id === 'notes') ? true : (el.id === 'end_time' ? /^[\d:：]+$/.test(val) : /^\d*\.?\d+$/.test(val));
-        el.classList.add(isValid ? 'status-valid' : 'status-error');
-    }
-
     const allInputs = document.querySelectorAll('.input-field');
     allInputs.forEach((input, index) => {
-        input.addEventListener('input', () => checkInputStatus(input));
-        input.addEventListener('focus', () => checkInputStatus(input));
-        input.addEventListener('blur', () => checkInputStatus(input));
+        input.addEventListener('input', function() {
+            if (this.value.trim() !== '') {
+                this.classList.add('is-filled');
+            } else {
+                this.classList.remove('is-filled');
+            }
+        });
+
         input.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
-                e.preventDefault();
-                if (index < allInputs.length - 1) allInputs[index + 1].focus();
-                else this.blur();
+                if (this.tagName === 'INPUT') {
+                    e.preventDefault(); 
+                    if (index < allInputs.length - 1) {
+                        allInputs[index + 1].focus(); 
+                    } else {
+                        this.blur(); 
+                    }
+                }
             }
         });
     });
 
     function generateReport() {
-        let timeStr = document.getElementById('end_time').value.trim();
-        if (/^\d+$/.test(timeStr)) timeStr += ":00";
-        timeStr = timeStr.replace("：", ":");
+        let endTimeInput = document.getElementById('end_time');
+        let timeStr = endTimeInput.value.trim();
+        if (timeStr) {
+            if (/^\d+$/.test(timeStr)) {
+                timeStr += ":00";
+            }
+            timeStr = timeStr.replace("：", ":");
+            endTimeInput.value = timeStr; 
+            endTimeInput.classList.add('is-filled');
+        }
 
         let totalHours = 0;
+        
+        let carriedStr = document.getElementById('carried_hours').value.trim();
+        if (/^\d*\.?\d+$/.test(carriedStr)) {
+            totalHours += parseFloat(carriedStr);
+        }
+
         for (let i = 10; i <= 22; i++) {
-            let val = parseFloat(document.getElementById('h' + i).value.trim());
-            if (!isNaN(val)) totalHours += val;
+            let valStr = document.getElementById('h' + i).value.trim();
+            if (/^\d*\.?\d+$/.test(valStr)) {
+                totalHours += parseFloat(valStr);
+            }
         }
         
-        let qty = parseInt(document.getElementById('qty').value.trim(), 10) || 0;
+        let qtyStr = document.getElementById('qty').value.trim();
+        let qty = /^\d*\.?\d+$/.test(qtyStr) ? parseInt(qtyStr, 10) : 0;
+        
         let eff = totalHours > 0 ? (qty / totalHours) : 0;
 
         let d = new Date();
-        let today = `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+        let month = String(d.getMonth() + 1).padStart(2, '0');
+        let day = String(d.getDate()).padStart(2, '0');
+        let today = `${month}/${day}`;
 
-        let finalReport = `${today}\n\n截止时间：${timeStr}\n维修数量：${qty}\n维修工时：${totalHours.toFixed(1)}\n维修效率：${eff.toFixed(2)}`;
+        let baseReport = `${today}\n\n截止时间：${timeStr}\n维修工时：${totalHours.toFixed(1)}\n维修效率：${eff.toFixed(2)}`;
         let notes = document.getElementById('notes').value.trim();
-        if (notes) finalReport += `\n\n分享：\n${notes}`;
+        let finalReport = notes ? `${baseReport}\n\n分享：\n${notes}` : baseReport;
 
         document.getElementById('report-output').innerHTML = finalReport.replace(/\n/g, '<br>');
         document.getElementById('hidden-copy-text').value = finalReport;
-        document.getElementById('result-section').style.display = 'block';
-        document.getElementById('result-section').scrollIntoView({ behavior: 'smooth' });
+        
+        let resultSection = document.getElementById('result-section');
+        resultSection.style.display = 'block';
+
+        setTimeout(() => {
+            resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
     }
 
     function copyReport() {
         let copyText = document.getElementById('hidden-copy-text');
         copyText.select();
+        copyText.setSelectionRange(0, 99999); 
         document.execCommand("copy");
+
         let btn = document.getElementById('copy-btn');
+        let originalText = btn.innerText;
         btn.innerText = "复制成功！";
-        setTimeout(() => { btn.innerText = "点击复制报告内容"; }, 2000);
+        btn.style.backgroundColor = "#dcf5d0"; 
+        
+        setTimeout(() => {
+            btn.innerText = originalText;
+            btn.style.backgroundColor = "#f8cbcc"; 
+        }, 2000);
     }
 
     function clearData() {
-        window.location.reload();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        setTimeout(() => {
+            allInputs.forEach(input => {
+                input.value = '';
+                input.classList.remove('is-filled');
+            });
+            document.getElementById('result-section').style.display = 'none';
+        }, 300); 
     }
 </script>
+
 </body>
 </html>
