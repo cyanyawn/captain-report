@@ -274,7 +274,19 @@ if shared_data["is_active"]:
     accept_color = "#FF3B30" if can_accept < 0 else "#6200EE"
     accept_display = 0 if can_accept < 0 else can_accept
     
-    warning_html = f"""<div class="pred-note" style="color: #FF3B30;">⚠️ 警告：当前任务已超出剩余产能 {abs(can_accept)} 台！</div>""" if can_accept < 0 else f"""<div class="pred-note">* 按单台耗时 {int(mins_per_device)} 分钟计算</div>"""
+    # --- 新增：计算超出产能所需的额外时间 ---
+    if can_accept < 0:
+        excess_qty = abs(can_accept)
+        # 计算额外需要的小时数：超出数量 * 每台耗时 / 60分钟
+        extra_hours_needed = (excess_qty * mins_per_device) / 60.0
+        warning_html = f"""
+        <div class="pred-note" style="color: #FF3B30; font-size: 13px; line-height: 1.6;">
+            ⚠️ 警告：当前任务已超出剩余产能 <strong>{excess_qty}</strong> 台！<br>
+            ⏳ 预计还需 <strong>{extra_hours_needed:.1f}</strong> 小时才能清掉队列
+        </div>
+        """
+    else:
+        warning_html = f"""<div class="pred-note">* 按单台耗时 {int(mins_per_device)} 分钟计算</div>"""
 
     card_html = f"""
     <div class="prediction-card">
@@ -344,6 +356,13 @@ function enhanceInputs() {
     const inputs = Array.from(doc.querySelectorAll('input:not([type="hidden"]), textarea'));
     
     inputs.forEach((input, index) => {
+        // --- 核心修改：强制唤起带数字排的 QWERTY 键盘 ---
+        if (input.getAttribute('type') === 'number') {
+            input.setAttribute('type', 'text');
+            // 使用 email 模式是前端的经典 Hack：它会强制输入法弹出英文 QWERTY 全键盘（通常自带数字排），并且完美支持 Next 键
+            input.setAttribute('inputmode', 'email');
+        }
+
         let label = input.getAttribute('aria-label');
         if (label && label.startsWith('hour_')) {
             let hour = label.split('_')[1];
@@ -354,6 +373,7 @@ function enhanceInputs() {
             input.setAttribute('placeholder', '请输入正在维修数量');
         }
         
+        // 设置键盘右下角的按钮为 Next 或 Done
         if (index < inputs.length - 1) {
             input.setAttribute('enterkeyhint', 'next');
         } else {
@@ -368,6 +388,15 @@ function enhanceInputs() {
                 wrapper.classList.remove('is-filled');
             }
         }
+        
+        // --- 体验优化：获得焦点时自动全选 ---
+        // 这样按 Next 跳到下一个框时，直接按数字就能覆盖原来的值，不用按退格键！
+        if (!input.dataset.focusedAttached) {
+            input.addEventListener('focus', function() {
+                setTimeout(() => this.select(), 50);
+            });
+            input.dataset.focusedAttached = 'true';
+        }
     });
 }
 
@@ -375,6 +404,7 @@ killBadge();
 setInterval(enhanceInputs, 500);
 doc.body.addEventListener('input', enhanceInputs);
 
+// 监听回车(Next)键，实现焦点自动跳跃
 doc.body.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') {
         if (e.target.tagName === 'INPUT') {
