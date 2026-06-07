@@ -132,6 +132,7 @@ def get_shared_data():
         "is_active": False,
         "close_time": 22.0,
         "efficiency": 40.0,
+        "support_hours": None,
         "wait_qty": None,
         "repairing_qty": None,
         "hours": {h: None for h in range(10, 23)},
@@ -145,6 +146,7 @@ today_date = get_bj_time().date()
 if shared_data["date"] < today_date:
     shared_data["date"] = today_date
     shared_data["is_active"] = False
+    shared_data["support_hours"] = None
     shared_data["wait_qty"] = None
     shared_data["repairing_qty"] = None
     for h in range(10, 23):
@@ -195,6 +197,9 @@ hours_input = {}
 for h in range(10, 23):
     hours_input[h] = st.number_input(f"hour_{h}", value=shared_data["hours"][h], min_value=0.0, step=1.0, label_visibility="collapsed")
 
+st.markdown("新增支援工时 <span class='subtitle'>(额外增加的总小时数)</span>", unsafe_allow_html=True)
+support_hours_input = st.number_input("support_hours", value=shared_data.get("support_hours"), min_value=0.0, step=0.5, label_visibility="collapsed")
+
 st.markdown("当前等待维修数量 <span class='subtitle'>(积压排队的设备数)</span>", unsafe_allow_html=True)
 wait_qty_input = st.number_input("wait_qty", value=shared_data["wait_qty"], min_value=0.0, step=1.0, label_visibility="collapsed")
 
@@ -217,6 +222,7 @@ if generate_clicked:
         shared_data["update_time"] = get_bj_time().strftime("%H:%M")
         shared_data["close_time"] = close_time_input
         shared_data["efficiency"] = efficiency_input
+        shared_data["support_hours"] = support_hours_input
         shared_data["wait_qty"] = wait_qty_input
         shared_data["repairing_qty"] = repairing_qty_input
         for h in range(10, 23):
@@ -281,6 +287,10 @@ if shared_data["is_active"]:
         ratio = left_mins / block_total_mins
         val = calc_val(shared_data["hours"][i])
         remaining_hours += val * ratio
+    
+    # 把支援工时加到总剩余工时里
+    support_hours_val = calc_val(shared_data.get("support_hours"))
+    remaining_hours += support_hours_val
             
     wait_qty = int(calc_val(shared_data["wait_qty"]))
     repairing_qty = int(calc_val(shared_data["repairing_qty"]))
@@ -291,7 +301,6 @@ if shared_data["is_active"]:
     accept_color = "#FF3B30" if can_accept < 0 else "#6200EE"
     accept_display = 0 if can_accept < 0 else can_accept
     
-    # --- 修复：单行 HTML 字符串，防止 Markdown 渲染为代码块 ---
     if can_accept < 0:
         excess_qty = abs(can_accept)
         extra_hours_needed = (excess_qty * mins_per_device) / 60.0
@@ -299,6 +308,16 @@ if shared_data["is_active"]:
     else:
         warning_html = f"<div class='pred-note' style='text-align: right;'>* 按单台耗时 {int(mins_per_device)} 分钟计算</div>"
 
+    support_row_html = f"""
+        <div class="pred-data-row" style="color: #4CAF50;">
+            <span>➕ 包含支援工时：</span>
+            <span><span class="pred-highlight" style="color: #4CAF50 !important;">{support_hours_val:.1f}</span> h</span>
+        </div>
+    """ if support_hours_val > 0 else ""
+
+    # --- 修改点：调整颜色 ---
+    # 总产能：红色 (#FF3B30)
+    # 减去项：绿色 (#4CAF50)
     card_html = f"""
     <div class="prediction-card">
         <div class="pred-title">
@@ -309,17 +328,18 @@ if shared_data["is_active"]:
             <span>从 <strong>{start_time_str}</strong> 到 <strong>{end_time_str}</strong> 剩余工时：</span>
             <span><span class="pred-highlight">{remaining_hours:.1f}</span> h</span>
         </div>
+        {support_row_html}
         <div class="pred-data-row">
             <span>剩余工时总产能：</span>
-            <span><span class="pred-highlight">{total_capacity}</span> 台</span>
+            <span><span class="pred-highlight" style="color: #FF3B30 !important;">{total_capacity}</span> 台</span>
         </div>
         <div class="pred-data-row">
             <span>减去当前等待维修：</span>
-            <span><span class="pred-highlight" style="color: #FF3B30 !important;">{wait_qty}</span> 台</span>
+            <span><span class="pred-highlight" style="color: #4CAF50 !important;">{wait_qty}</span> 台</span>
         </div>
         <div class="pred-data-row">
             <span>减去当前正在维修：</span>
-            <span><span class="pred-highlight" style="color: #FF3B30 !important;">{repairing_qty}</span> 台</span>
+            <span><span class="pred-highlight" style="color: #4CAF50 !important;">{repairing_qty}</span> 台</span>
         </div>
         <hr class="dashed">
         <div class="pred-data-row" style="font-size: 18px; font-weight: bold;">
@@ -334,6 +354,7 @@ if shared_data["is_active"]:
 # 10. 手动清空与刷新按钮
 def clear_data():
     shared_data["is_active"] = False
+    shared_data["support_hours"] = None
     shared_data["wait_qty"] = None
     shared_data["repairing_qty"] = None
     for h in range(10, 23):
@@ -379,6 +400,8 @@ function enhanceInputs() {
         if (label && label.startsWith('hour_')) {
             let hour = label.split('_')[1];
             input.setAttribute('placeholder', hour + ':00');
+        } else if (label === 'support_hours') {
+            input.setAttribute('placeholder', '请输入支援工时');
         } else if (label === 'wait_qty') {
             input.setAttribute('placeholder', '请输入等待数量');
         } else if (label === 'repairing_qty') {
