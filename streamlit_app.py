@@ -5,16 +5,33 @@ import streamlit.components.v1 as components
 # 1. 页面配置
 st.set_page_config(page_title="预计维修数量工具", layout="centered")
 
-# 2. 强力 CSS
+# 2. 强力 CSS (新增强制浅色模式)
 st.markdown("""
     <style>
+    /* --- 强制浅色模式防御代码 --- */
+    :root { color-scheme: light !important; }
+    .stApp, [data-testid="stAppViewContainer"], .main {
+        background-color: #FFFFFF !important;
+        color: #333333 !important;
+    }
+    .stMarkdown, .stMarkdown p { color: #333333 !important; }
+    
+    /* 强制输入框在深色模式下也是白底黑字 */
+    div[data-baseweb="input"], div[data-baseweb="input"] > div {
+        background-color: #FFFFFF !important;
+    }
+    input {
+        color: #333333 !important;
+        -webkit-text-fill-color: #333333 !important;
+    }
+    /* -------------------------- */
+
     header {display: none !important;}
     .block-container { padding-top: 1.5rem !important; padding-bottom: 2rem !important; }
     #MainMenu, footer {visibility: hidden !important; display: none !important;}
     .stDeployButton {display: none !important;}
     [data-testid="stDeployButton"] {display: none !important;}
     div[class*="viewerBadge"] {display: none !important;}
-    .stApp {background-color: #FFFFFF;}
     
     div[data-testid="InputInstructions"] { display: none !important; }
     div[data-testid="stNumberInput"] button { display: none !important; }
@@ -24,7 +41,7 @@ st.markdown("""
         font-weight: bold !important;
         color: #154A7F !important;
     }
-    .subtitle { font-size: 12px; color: #888888; font-weight: normal; }
+    .subtitle { font-size: 12px; color: #888888 !important; font-weight: normal; }
 
     div.stButton { display: flex !important; justify-content: center !important; width: 100% !important; }
 
@@ -68,7 +85,7 @@ st.markdown("""
         border-radius: 12px;
         padding: 15px;
         margin-top: 20px;
-        color: #4A3082;
+        color: #4A3082 !important;
         box-shadow: 0 4px 12px rgba(74, 48, 130, 0.08);
     }
     .pred-title {
@@ -86,8 +103,8 @@ st.markdown("""
         margin-bottom: 8px;
         font-size: 15px;
     }
-    .pred-highlight { font-size: 18px; font-weight: 900; color: #6200EE; }
-    .pred-note { font-size: 12px; color: #7E6BC4; margin-top: 10px; text-align: right; }
+    .pred-highlight { font-size: 18px; font-weight: 900; color: #6200EE !important; }
+    .pred-note { font-size: 12px; color: #7E6BC4 !important; margin-top: 10px; text-align: right; }
     hr.dashed { border-top: 1px dashed #D1C4E9; margin: 12px 0; }
     
     div[data-baseweb="input"].is-filled {
@@ -161,7 +178,7 @@ if not st.session_state.authenticated:
 # -----------------------------------------
 # 6. 标题区
 # -----------------------------------------
-st.markdown("<h1>预计维修数量工具 V1.0</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='color: #154A7F !important;'>预计维修数量工具 V1.0</h1>", unsafe_allow_html=True)
 st.markdown("<hr style='margin-top: -10px; border-top: 1px solid #d3d3d3;'>", unsafe_allow_html=True)
 
 # -----------------------------------------
@@ -274,19 +291,13 @@ if shared_data["is_active"]:
     accept_color = "#FF3B30" if can_accept < 0 else "#6200EE"
     accept_display = 0 if can_accept < 0 else can_accept
     
-    # --- 新增：计算超出产能所需的额外时间 ---
+    # --- 修复：单行 HTML 字符串，防止 Markdown 渲染为代码块 ---
     if can_accept < 0:
         excess_qty = abs(can_accept)
-        # 计算额外需要的小时数：超出数量 * 每台耗时 / 60分钟
         extra_hours_needed = (excess_qty * mins_per_device) / 60.0
-        warning_html = f"""
-        <div class="pred-note" style="color: #FF3B30; font-size: 13px; line-height: 1.6;">
-            ⚠️ 警告：当前任务已超出剩余产能 <strong>{excess_qty}</strong> 台！<br>
-            ⏳ 预计还需 <strong>{extra_hours_needed:.1f}</strong> 小时才能清掉队列
-        </div>
-        """
+        warning_html = f"<div class='pred-note' style='color: #FF3B30 !important; font-size: 13px; line-height: 1.6; text-align: right;'>⚠️ 警告：当前任务已超出剩余产能 <strong>{excess_qty}</strong> 台！<br>⏳ 预计还需 <strong>{extra_hours_needed:.1f}</strong> 小时才能清掉队列</div>"
     else:
-        warning_html = f"""<div class="pred-note">* 按单台耗时 {int(mins_per_device)} 分钟计算</div>"""
+        warning_html = f"<div class='pred-note' style='text-align: right;'>* 按单台耗时 {int(mins_per_device)} 分钟计算</div>"
 
     card_html = f"""
     <div class="prediction-card">
@@ -304,16 +315,16 @@ if shared_data["is_active"]:
         </div>
         <div class="pred-data-row">
             <span>减去当前等待维修：</span>
-            <span><span class="pred-highlight" style="color: #FF3B30;">{wait_qty}</span> 台</span>
+            <span><span class="pred-highlight" style="color: #FF3B30 !important;">{wait_qty}</span> 台</span>
         </div>
         <div class="pred-data-row">
             <span>减去当前正在维修：</span>
-            <span><span class="pred-highlight" style="color: #FF3B30;">{repairing_qty}</span> 台</span>
+            <span><span class="pred-highlight" style="color: #FF3B30 !important;">{repairing_qty}</span> 台</span>
         </div>
         <hr class="dashed">
         <div class="pred-data-row" style="font-size: 18px; font-weight: bold;">
             <span>✨ 还可以接入新单：</span>
-            <span><span class="pred-highlight" style="font-size: 24px; color: {accept_color};">{accept_display}</span> 台</span>
+            <span><span class="pred-highlight" style="font-size: 24px; color: {accept_color} !important;">{accept_display}</span> 台</span>
         </div>
         {warning_html}
     </div>
@@ -356,11 +367,12 @@ function enhanceInputs() {
     const inputs = Array.from(doc.querySelectorAll('input:not([type="hidden"]), textarea'));
     
     inputs.forEach((input, index) => {
-        // --- 核心修改：强制唤起带数字排的 QWERTY 键盘 ---
+        // --- 核心修改：iOS Safari 键盘真神方案 ---
+        // 保持 type="number"，但移除可能导致弹出纯九宫格的 inputmode 和 pattern
+        // 这样 iOS 就会弹出带有数字排的符号全键盘，并且完美支持 Next 键！
         if (input.getAttribute('type') === 'number') {
-            input.setAttribute('type', 'text');
-            // 使用 email 模式是前端的经典 Hack：它会强制输入法弹出英文 QWERTY 全键盘（通常自带数字排），并且完美支持 Next 键
-            input.setAttribute('inputmode', 'email');
+            input.removeAttribute('inputmode');
+            input.removeAttribute('pattern');
         }
 
         let label = input.getAttribute('aria-label');
@@ -390,7 +402,6 @@ function enhanceInputs() {
         }
         
         // --- 体验优化：获得焦点时自动全选 ---
-        // 这样按 Next 跳到下一个框时，直接按数字就能覆盖原来的值，不用按退格键！
         if (!input.dataset.focusedAttached) {
             input.addEventListener('focus', function() {
                 setTimeout(() => this.select(), 50);
