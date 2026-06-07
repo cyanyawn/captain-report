@@ -140,19 +140,18 @@
             opacity: 0;
         }
 
-        /* --- 新增：实时预计效率显示 --- */
+        /* --- 实时预计效率显示 --- */
         .live-efficiency {
             font-size: 15px;
             font-weight: bold;
-            color: #6200EE; /* 醒目的紫色 */
+            color: #6200EE; 
             margin-top: 20px;
             margin-bottom: 5px;
             padding: 10px;
             background-color: #F4F0FF;
             border-radius: 8px;
             border: 1px dashed #D1C4E9;
-            display: none; /* 默认隐藏，有数据时才显示 */
-            transition: all 0.3s ease;
+            display: none; 
         }
     </style>
 </head>
@@ -177,7 +176,7 @@
         <!-- JS 自动生成 -->
     </div>
 
-    <!-- 新增：实时预计效率显示区 -->
+    <!-- 实时预计效率显示区 -->
     <div id="live-eff-display" class="live-efficiency">
         * 预计效率：<span id="live-eff-value">0.00</span>
     </div>
@@ -199,7 +198,8 @@
         <textarea id="hidden-copy-text" readonly></textarea>
         
         <div class="btn-container">
-            <button id="copy-btn" class="btn-copy" onclick="copyReport()">点击复制报告内容</button>
+            <!-- 按钮文案稍微优化，提示可以分享 -->
+            <button id="copy-btn" class="btn-copy" onclick="copyAndShare()">点击复制并分享</button>
         </div>
         
         <div class="btn-container" style="margin-top: 15px;">
@@ -215,14 +215,14 @@
         let input = document.createElement('input');
         input.type = 'number';
         input.id = 'h' + i;
-        input.className = 'input-field calc-trigger'; // 加上触发计算的 class
+        input.className = 'input-field calc-trigger'; 
         input.setAttribute('enterkeyhint', 'next');
         input.placeholder = i + ':00';
         input.style.marginBottom = '10px';
         hoursContainer.appendChild(input);
     }
 
-    // --- 新增：实时计算效率逻辑 ---
+    // --- 实时计算效率逻辑 ---
     function calculateLiveEfficiency() {
         let totalHours = 0;
         
@@ -244,7 +244,6 @@
         let eff = totalHours > 0 ? (qty / totalHours) : 0;
         let effDisplay = document.getElementById('live-eff-display');
         
-        // 只有当工时或者数量大于 0 时，才显示这个提示框
         if (totalHours > 0 || qty > 0) {
             document.getElementById('live-eff-value').innerText = eff.toFixed(2);
             effDisplay.style.display = 'block';
@@ -262,7 +261,6 @@
             } else {
                 this.classList.remove('is-filled');
             }
-            // 只要输入改变，立刻触发重新计算
             if (this.classList.contains('calc-trigger')) {
                 calculateLiveEfficiency();
             }
@@ -291,7 +289,6 @@
                 timeStr += ":00";
             }
             timeStr = timeStr.replace("：", ":");
-            // 注意：type="number" 不能直接赋带冒号的值，所以只在文本里用
         }
 
         let totalHours = 0;
@@ -317,7 +314,6 @@
         let day = String(d.getDate()).padStart(2, '0');
         let today = `${month}/${day}`;
 
-        // 格式：日期 -> 截止时间 -> 维修数量 -> 维修工时 -> 维修效率
         let baseReport = `${today}\n\n截止时间：${timeStr}\n维修数量：${qty}\n维修工时：${totalHours.toFixed(1)}\n维修效率：${eff.toFixed(2)}`;
         
         let notes = document.getElementById('notes').value.trim();
@@ -334,9 +330,12 @@
         }, 100);
     }
 
-    // 4. 复制逻辑
-    function copyReport() {
+    // 4. 核心修改：复制并调用系统原生分享
+    function copyAndShare() {
         let copyText = document.getElementById('hidden-copy-text');
+        let reportContent = copyText.value;
+        
+        // 步骤 1：先执行复制到剪贴板，确保万无一失
         copyText.select();
         copyText.setSelectionRange(0, 99999); 
         document.execCommand("copy");
@@ -345,6 +344,18 @@
         let originalText = btn.innerText;
         btn.innerText = "复制成功！";
         btn.style.backgroundColor = "#dcf5d0"; 
+        
+        // 步骤 2：调用 iOS 原生分享面板 (Web Share API)
+        if (navigator.share) {
+            navigator.share({
+                title: '维修报告',
+                text: reportContent
+            }).then(() => {
+                console.log('分享成功');
+            }).catch((error) => {
+                console.log('分享取消或失败', error);
+            });
+        }
         
         setTimeout(() => {
             btn.innerText = originalText;
@@ -361,7 +372,7 @@
                 input.classList.remove('is-filled');
             });
             document.getElementById('result-section').style.display = 'none';
-            document.getElementById('live-eff-display').style.display = 'none'; // 清空时隐藏预览框
+            document.getElementById('live-eff-display').style.display = 'none'; 
         }, 300); 
     }
 </script>
