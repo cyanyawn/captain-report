@@ -133,6 +133,7 @@ def get_shared_data():
         "close_time": 22.0,
         "efficiency": 40.0,
         "support_hours": None,
+        "support_start_time": 14.0,  # 新增：支援开始时间，默认下午2点
         "wait_qty": None,
         "repairing_qty": None,
         "hours": {h: None for h in range(10, 23)},
@@ -147,6 +148,7 @@ if shared_data["date"] < today_date:
     shared_data["date"] = today_date
     shared_data["is_active"] = False
     shared_data["support_hours"] = None
+    shared_data["support_start_time"] = 14.0
     shared_data["wait_qty"] = None
     shared_data["repairing_qty"] = None
     for h in range(10, 23):
@@ -200,6 +202,10 @@ for h in range(10, 23):
 st.markdown("新增支援工时 <span class='subtitle'>(额外增加的总小时数)</span>", unsafe_allow_html=True)
 support_hours_input = st.number_input("support_hours", value=shared_data.get("support_hours"), min_value=0.0, step=0.5, label_visibility="collapsed")
 
+# --- 新增：支援工时开始时间 ---
+st.markdown("支援工时开始时间 <span class='subtitle'>(支持半小时，如 14.5 代表 14:30)</span>", unsafe_allow_html=True)
+support_start_time_input = st.number_input("support_start_time", value=shared_data.get("support_start_time", 14.0), step=0.5, label_visibility="collapsed")
+
 st.markdown("当前等待维修数量 <span class='subtitle'>(积压排队的设备数)</span>", unsafe_allow_html=True)
 wait_qty_input = st.number_input("wait_qty", value=shared_data["wait_qty"], min_value=0.0, step=1.0, label_visibility="collapsed")
 
@@ -223,6 +229,7 @@ if generate_clicked:
         shared_data["close_time"] = close_time_input
         shared_data["efficiency"] = efficiency_input
         shared_data["support_hours"] = support_hours_input
+        shared_data["support_start_time"] = support_start_time_input  # 保存支援开始时间
         shared_data["wait_qty"] = wait_qty_input
         shared_data["repairing_qty"] = repairing_qty_input
         for h in range(10, 23):
@@ -288,9 +295,30 @@ if shared_data["is_active"]:
         val = calc_val(shared_data["hours"][i])
         remaining_hours += val * ratio
     
-    # 把支援工时加到总剩余工时里
-    support_hours_val = calc_val(shared_data.get("support_hours"))
-    remaining_hours += support_hours_val
+    # --- 升级版：根据“支援开始时间”进行支援工时衰减 ---
+    support_hours_total = calc_val(shared_data.get("support_hours"))
+    support_start_time = calc_val(shared_data.get("support_start_time", 14.0))
+    remaining_support_hours = 0.0
+    
+    if support_hours_total > 0:
+        support_start_mins = int(support_start_time * 60)
+        total_support_duration_mins = close_mins - support_start_mins
+        
+        if total_support_duration_mins > 0:
+            # 计算在支援时间段内，还剩下百分之多少的时间
+            if now_mins <= support_start_mins:
+                # 还没到支援开始时间，支援工时100%保留
+                support_left_ratio = 1.0
+            elif now_mins >= close_mins:
+                # 已经关店，支援工时归零
+                support_left_ratio = 0.0
+            else:
+                # 处于支援时间段内，按时间流逝等比例扣减
+                support_left_ratio = (close_mins - now_mins) / total_support_duration_mins
+            
+            # 剩余支援工时 = 总支援工时 * 剩余时间比例
+            remaining_support_hours = support_hours_total * support_left_ratio
+            remaining_hours += remaining_support_hours
             
     wait_qty = int(calc_val(shared_data["wait_qty"]))
     repairing_qty = int(calc_val(shared_data["repairing_qty"]))
@@ -309,10 +337,11 @@ if shared_data["is_active"]:
     else:
         warning_html = f"<div class='pred-note' style='text-align: right;'>* 按单台耗时 {int(mins_per_device)} 分钟计算</div>"
 
-    if support_hours_val > 0:
+    # 如果有支援工时，显示剩余的支援工时和原始总工时
+    if support_hours_total > 0:
         support_row_html = f"""<div class="pred-data-row" style="color: #4CAF50;">
-<span>➕ 包含支援工时：</span>
-<span><span class="pred-highlight" style="color: #4CAF50 !important;">{support_hours_val:.1f}</span> h</span>
+<span>➕ 包含剩余支援工时：</span>
+<span><span class="pred-highlight" style="color: #4CAF50 !important;">{remaining_support_hours:.1f}</span> h <span style="font-size: 12px; color: #888888; font-weight: normal;">(总 {support_hours_total:.1f}h)</span></span>
 </div>"""
     else:
         support_row_html = ""
@@ -353,6 +382,7 @@ if shared_data["is_active"]:
 def clear_data():
     shared_data["is_active"] = False
     shared_data["support_hours"] = None
+    shared_data["support_start_time"] = 14.0
     shared_data["wait_qty"] = None
     shared_data["repairing_qty"] = None
     for h in range(10, 23):
@@ -400,6 +430,8 @@ function enhanceInputs() {
             input.setAttribute('placeholder', hour + ':00');
         } else if (label === 'support_hours') {
             input.setAttribute('placeholder', '请输入支援工时');
+        } else if (label === 'support_start_time') {
+            input.setAttribute('placeholder', '请输入开始时间');
         } else if (label === 'wait_qty') {
             input.setAttribute('placeholder', '请输入等待数量');
         } else if (label === 'repairing_qty') {
