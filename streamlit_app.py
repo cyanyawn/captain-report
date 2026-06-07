@@ -301,6 +301,7 @@ if shared_data["is_active"]:
     accept_color = "#FF3B30" if can_accept < 0 else "#6200EE"
     accept_display = 0 if can_accept < 0 else can_accept
     
+    # 彻底消除 HTML 字符串中的缩进，防止触发 Markdown 代码块 Bug
     if can_accept < 0:
         excess_qty = abs(can_accept)
         extra_hours_needed = (excess_qty * mins_per_device) / 60.0
@@ -308,47 +309,44 @@ if shared_data["is_active"]:
     else:
         warning_html = f"<div class='pred-note' style='text-align: right;'>* 按单台耗时 {int(mins_per_device)} 分钟计算</div>"
 
-    support_row_html = f"""
-        <div class="pred-data-row" style="color: #4CAF50;">
-            <span>➕ 包含支援工时：</span>
-            <span><span class="pred-highlight" style="color: #4CAF50 !important;">{support_hours_val:.1f}</span> h</span>
-        </div>
-    """ if support_hours_val > 0 else ""
+    if support_hours_val > 0:
+        support_row_html = f"""<div class="pred-data-row" style="color: #4CAF50;">
+<span>➕ 包含支援工时：</span>
+<span><span class="pred-highlight" style="color: #4CAF50 !important;">{support_hours_val:.1f}</span> h</span>
+</div>"""
+    else:
+        support_row_html = ""
 
-    # --- 修改点：调整颜色 ---
-    # 总产能：红色 (#FF3B30)
-    # 减去项：绿色 (#4CAF50)
-    card_html = f"""
-    <div class="prediction-card">
-        <div class="pred-title">
-            <span>⏱️ 团队产能看板</span>
-            <span style="font-size: 12px; color: #7E6BC4; font-weight: normal;">上次更新: {shared_data['updater_name']} @ {shared_data['update_time']}</span>
-        </div>
-        <div class="pred-data-row">
-            <span>从 <strong>{start_time_str}</strong> 到 <strong>{end_time_str}</strong> 剩余工时：</span>
-            <span><span class="pred-highlight">{remaining_hours:.1f}</span> h</span>
-        </div>
-        {support_row_html}
-        <div class="pred-data-row">
-            <span>剩余工时总产能：</span>
-            <span><span class="pred-highlight" style="color: #FF3B30 !important;">{total_capacity}</span> 台</span>
-        </div>
-        <div class="pred-data-row">
-            <span>减去当前等待维修：</span>
-            <span><span class="pred-highlight" style="color: #4CAF50 !important;">{wait_qty}</span> 台</span>
-        </div>
-        <div class="pred-data-row">
-            <span>减去当前正在维修：</span>
-            <span><span class="pred-highlight" style="color: #4CAF50 !important;">{repairing_qty}</span> 台</span>
-        </div>
-        <hr class="dashed">
-        <div class="pred-data-row" style="font-size: 18px; font-weight: bold;">
-            <span>✨ 还可以接入新单：</span>
-            <span><span class="pred-highlight" style="font-size: 24px; color: {accept_color} !important;">{accept_display}</span> 台</span>
-        </div>
-        {warning_html}
-    </div>
-    """
+    card_html = f"""<div class="prediction-card">
+<div class="pred-title">
+<span>⏱️ 团队产能看板</span>
+<span style="font-size: 12px; color: #7E6BC4; font-weight: normal;">上次更新: {shared_data['updater_name']} @ {shared_data['update_time']}</span>
+</div>
+<div class="pred-data-row">
+<span>从 <strong>{start_time_str}</strong> 到 <strong>{end_time_str}</strong> 剩余工时：</span>
+<span><span class="pred-highlight">{remaining_hours:.1f}</span> h</span>
+</div>
+{support_row_html}
+<div class="pred-data-row">
+<span>剩余工时总产能：</span>
+<span><span class="pred-highlight" style="color: #FF3B30 !important;">{total_capacity}</span> 台</span>
+</div>
+<div class="pred-data-row">
+<span>减去当前等待维修：</span>
+<span><span class="pred-highlight" style="color: #4CAF50 !important;">{wait_qty}</span> 台</span>
+</div>
+<div class="pred-data-row">
+<span>减去当前正在维修：</span>
+<span><span class="pred-highlight" style="color: #4CAF50 !important;">{repairing_qty}</span> 台</span>
+</div>
+<hr class="dashed">
+<div class="pred-data-row" style="font-size: 18px; font-weight: bold;">
+<span>✨ 还可以接入新单：</span>
+<span><span class="pred-highlight" style="font-size: 24px; color: {accept_color} !important;">{accept_display}</span> 台</span>
+</div>
+{warning_html}
+</div>"""
+    
     st.markdown(card_html, unsafe_allow_html=True)
 
 # 10. 手动清空与刷新按钮
