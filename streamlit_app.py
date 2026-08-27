@@ -346,10 +346,8 @@ if shared_data["is_active"]:
     # ==========================================
     target_tat_mins = 90
     queue_qty = wait_qty + repairing_qty
-    # 清理当前队列所需的绝对工时
     required_labor_hours_for_queue = queue_qty * (mins_per_device / 60.0)
 
-    # 设定未来 90 分钟的滑动时间窗口
     t_start = now_mins
     t_end = min(now_mins + target_tat_mins, close_mins)
     window_duration = t_end - t_start
@@ -357,13 +355,11 @@ if shared_data["is_active"]:
     available_labor_hours_in_window = 0.0
 
     if window_duration > 0:
-        # 1. 扫描常规排班在未来 90 分钟内的可用工时
         for i in range(10, 23):
             if i >= close_hour: continue
             block_start = i * 60
             block_end = int(min(i + 1, close_hour) * 60)
             
-            # 计算当前小时块与 90 分钟窗口的重叠时间
             overlap_start = max(t_start, block_start)
             overlap_end = min(t_end, block_end)
             overlap_mins = max(0, overlap_end - overlap_start)
@@ -372,13 +368,11 @@ if shared_data["is_active"]:
                 tech_count = calc_val(shared_data["hours"][i])
                 available_labor_hours_in_window += tech_count * (overlap_mins / 60.0)
                 
-        # 2. 扫描支援排班在未来 90 分钟内的可用工时
         if support_hours_total > 0:
             support_start_mins = int(support_start_time * 60)
             total_support_duration_mins = close_mins - support_start_mins
             
             if total_support_duration_mins > 0:
-                # 算出支援技师的人数密度
                 support_tech_count = support_hours_total / (total_support_duration_mins / 60.0)
                 
                 overlap_start = max(t_start, support_start_mins)
@@ -388,41 +382,34 @@ if shared_data["is_active"]:
                 if overlap_mins > 0:
                     available_labor_hours_in_window += support_tech_count * (overlap_mins / 60.0)
 
-    # 计算工时缺口
     sla_shortfall_hours = required_labor_hours_for_queue - available_labor_hours_in_window
     
-    # 构建 SLA 专属 UI 模块
+    # 构建 SLA 专属 UI 模块 (消除缩进，防止被 Markdown 识别为代码块)
     if queue_qty == 0:
-        sla_html = f"""
-        <hr class="dashed">
-        <div class="pred-data-row">
-            <span>🎯 90分钟 SLA 状态：</span>
-            <span><span class="pred-highlight" style="color: #4CAF50 !important; font-size: 16px;">🟢 队列为空</span></span>
-        </div>
-        """
+        sla_html = f"""<hr class="dashed">
+<div class="pred-data-row">
+<span>🎯 90分钟 SLA 状态：</span>
+<span><span class="pred-highlight" style="color: #4CAF50 !important; font-size: 16px;">🟢 队列为空</span></span>
+</div>"""
     elif sla_shortfall_hours <= 0:
-        sla_html = f"""
-        <hr class="dashed">
-        <div class="pred-data-row">
-            <span>🎯 90分钟 SLA 状态：</span>
-            <span><span class="pred-highlight" style="color: #4CAF50 !important; font-size: 16px;">🟢 达标 (产能充足)</span></span>
-        </div>
-        <div class="pred-note" style="text-align: right; margin-top: 4px;">
-            未来 90 分钟可用工时: <strong>{available_labor_hours_in_window:.1f}h</strong> | 清理队列需: <strong>{required_labor_hours_for_queue:.1f}h</strong>
-        </div>
-        """
+        sla_html = f"""<hr class="dashed">
+<div class="pred-data-row">
+<span>🎯 90分钟 SLA 状态：</span>
+<span><span class="pred-highlight" style="color: #4CAF50 !important; font-size: 16px;">🟢 达标 (产能充足)</span></span>
+</div>
+<div class="pred-note" style="text-align: right; margin-top: 4px;">
+未来 90 分钟可用工时: <strong>{available_labor_hours_in_window:.1f}h</strong> | 清理队列需: <strong>{required_labor_hours_for_queue:.1f}h</strong>
+</div>"""
     else:
-        sla_html = f"""
-        <hr class="dashed">
-        <div class="pred-data-row">
-            <span>🎯 90分钟 SLA 状态：</span>
-            <span><span class="pred-highlight" style="color: #FF3B30 !important; font-size: 16px;">🔴 超时预警</span></span>
-        </div>
-        <div class="pred-note" style="color: #FF3B30 !important; font-size: 13px; line-height: 1.6; text-align: right; margin-top: 4px;">
-            未来 90 分钟仅有 <strong>{available_labor_hours_in_window:.1f}h</strong> 工时，但清理队列需 <strong>{required_labor_hours_for_queue:.1f}h</strong><br>
-            ⚡️ 建议立即在接下来的 90 分钟内增加 <strong>{sla_shortfall_hours:.1f}</strong> 小时支援工时！
-        </div>
-        """
+        sla_html = f"""<hr class="dashed">
+<div class="pred-data-row">
+<span>🎯 90分钟 SLA 状态：</span>
+<span><span class="pred-highlight" style="color: #FF3B30 !important; font-size: 16px;">🔴 超时预警</span></span>
+</div>
+<div class="pred-note" style="color: #FF3B30 !important; font-size: 13px; line-height: 1.6; text-align: right; margin-top: 4px;">
+未来 90 分钟仅有 <strong>{available_labor_hours_in_window:.1f}h</strong> 工时，但清理队列需 <strong>{required_labor_hours_for_queue:.1f}h</strong><br>
+⚡️ 建议立即在接下来的 90 分钟内增加 <strong>{sla_shortfall_hours:.1f}</strong> 小时支援工时！
+</div>"""
     # ==========================================
 
     if can_accept < 0:
@@ -440,7 +427,7 @@ if shared_data["is_active"]:
     else:
         support_row_html = ""
 
-    # 组装最终卡片
+    # 组装最终卡片 (同样确保没有缩进)
     card_html = f"""<div class="prediction-card">
 <div class="pred-title">
 <span>⏱️ 团队产能看板</span>
@@ -463,9 +450,7 @@ if shared_data["is_active"]:
 <span>减去当前正在维修：</span>
 <span><span class="pred-highlight" style="color: #4CAF50 !important;">{repairing_qty}</span> 台</span>
 </div>
-
 {sla_html}
-
 <hr class="dashed">
 <div class="pred-data-row" style="font-size: 18px; font-weight: bold;">
 <span>✨ 还可以接入新单：</span>
