@@ -5,26 +5,50 @@ import streamlit.components.v1 as components
 # 1. 页面配置
 st.set_page_config(page_title="预计维修数量工具", layout="centered")
 
-# 2. 强力 CSS (新增强制浅色模式)
+# 2. 强力 CSS (终极强制浅色模式)
 st.markdown("""
     <style>
-    /* --- 强制浅色模式防御代码 --- */
-    :root { color-scheme: light !important; }
-    .stApp, [data-testid="stAppViewContainer"], .main {
+    /* =========================================
+       🚀 终极强制浅色模式 (无视系统深色模式)
+       ========================================= */
+    /* 强行覆盖 Streamlit 的底层 CSS 变量 */
+    :root, [data-theme="dark"], [data-theme="light"] {
+        --primary-color: #6200EE !important;
+        --background-color: #FFFFFF !important;
+        --secondary-background-color: #F8F9FA !important;
+        --text-color: #333333 !important;
+        color-scheme: light !important;
+    }
+    
+    /* 强制主容器白底黑字 */
+    html, body, .stApp, [data-testid="stAppViewContainer"], .main, .block-container {
         background-color: #FFFFFF !important;
         color: #333333 !important;
     }
-    .stMarkdown, .stMarkdown p { color: #333333 !important; }
     
-    /* 强制输入框在深色模式下也是白底黑字 */
+    /* 强制所有普通文本为深灰色 */
+    .stMarkdown, .stMarkdown p, .stMarkdown span { 
+        color: #333333 !important; 
+    }
+    
+    /* 强制输入框白底黑字及边框颜色 */
     div[data-baseweb="input"], div[data-baseweb="input"] > div {
         background-color: #FFFFFF !important;
+        border-color: #E0E0E0 !important;
     }
     input {
         color: #333333 !important;
         -webkit-text-fill-color: #333333 !important;
+        background-color: #FFFFFF !important;
     }
-    /* -------------------------- */
+    
+    /* 强制弹窗 (Toast) 也是浅色 */
+    div[data-testid="stToast"] {
+        background-color: #FFFFFF !important;
+        color: #333333 !important;
+        border: 1px solid #D1C4E9 !important;
+    }
+    /* ========================================= */
 
     header {display: none !important;}
     .block-container { padding-top: 1.5rem !important; padding-bottom: 2rem !important; }
