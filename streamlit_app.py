@@ -133,7 +133,7 @@ def get_shared_data():
         "close_time": 22.0,
         "efficiency": 40.0,
         "support_hours": None,
-        "support_start_time": 14.0,  # 新增：支援开始时间，默认下午2点
+        "support_start_time": 14.0, 
         "wait_qty": None,
         "repairing_qty": None,
         "hours": {h: None for h in range(10, 23)},
@@ -182,7 +182,7 @@ if not st.session_state.authenticated:
 # -----------------------------------------
 # 6. 标题区
 # -----------------------------------------
-st.markdown("<h1 style='color: #154A7F !important;'>预计维修数量工具 V1.0</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='color: #154A7F !important;'>预计维修数量工具 V1.1</h1>", unsafe_allow_html=True)
 st.markdown("<hr style='margin-top: -10px; border-top: 1px solid #d3d3d3;'>", unsafe_allow_html=True)
 
 # -----------------------------------------
@@ -202,7 +202,6 @@ for h in range(10, 23):
 st.markdown("新增支援工时 <span class='subtitle'>(额外增加的总小时数)</span>", unsafe_allow_html=True)
 support_hours_input = st.number_input("support_hours", value=shared_data.get("support_hours"), min_value=0.0, step=0.5, label_visibility="collapsed")
 
-# --- 新增：支援工时开始时间 ---
 st.markdown("支援工时开始时间 <span class='subtitle'>(支持半小时，如 14.5 代表 14:30)</span>", unsafe_allow_html=True)
 support_start_time_input = st.number_input("support_start_time", value=shared_data.get("support_start_time", 14.0), step=0.5, label_visibility="collapsed")
 
@@ -229,7 +228,7 @@ if generate_clicked:
         shared_data["close_time"] = close_time_input
         shared_data["efficiency"] = efficiency_input
         shared_data["support_hours"] = support_hours_input
-        shared_data["support_start_time"] = support_start_time_input  # 保存支援开始时间
+        shared_data["support_start_time"] = support_start_time_input  
         shared_data["wait_qty"] = wait_qty_input
         shared_data["repairing_qty"] = repairing_qty_input
         for h in range(10, 23):
@@ -248,19 +247,16 @@ if shared_data["is_active"]:
     mins_per_device = shared_data["efficiency"]
     if mins_per_device <= 0: mins_per_device = 40.0 
     
-    # --- 核心魔法：时间等比例扣减算法 ---
     now = get_bj_time()
     curr_h = now.hour
     curr_m = now.minute
     now_mins = curr_h * 60 + curr_m
     close_mins = int(close_hour * 60)
     
-    # 格式化结束时间
     close_hour_display = int(close_hour)
     close_min_display = "30" if close_hour % 1 == 0.5 else "00"
     end_time_str = f"{close_hour_display}:{close_min_display}"
     
-    # 决定显示的开始时间
     if now_mins < 10 * 60:
         start_time_str = "10:00"
     elif now_mins >= close_mins:
@@ -270,7 +266,7 @@ if shared_data["is_active"]:
     
     remaining_hours = 0.0
     
-    # 精确计算每个小时块的剩余比例
+    # 宏观剩余工时计算
     for i in range(10, 23):
         if i >= close_hour:
             continue
@@ -282,7 +278,6 @@ if shared_data["is_active"]:
         if block_total_mins <= 0:
             continue
             
-        # 计算当前这个块还剩多少分钟
         if now_mins >= block_end_mins:
             left_mins = 0
         elif now_mins <= block_start_mins:
@@ -290,12 +285,10 @@ if shared_data["is_active"]:
         else:
             left_mins = block_end_mins - now_mins
             
-        # 计算剩余比例并累加
         ratio = left_mins / block_total_mins
         val = calc_val(shared_data["hours"][i])
         remaining_hours += val * ratio
     
-    # --- 升级版：根据“支援开始时间”进行支援工时衰减 ---
     support_hours_total = calc_val(shared_data.get("support_hours"))
     support_start_time = calc_val(shared_data.get("support_start_time", 14.0))
     remaining_support_hours = 0.0
@@ -305,18 +298,13 @@ if shared_data["is_active"]:
         total_support_duration_mins = close_mins - support_start_mins
         
         if total_support_duration_mins > 0:
-            # 计算在支援时间段内，还剩下百分之多少的时间
             if now_mins <= support_start_mins:
-                # 还没到支援开始时间，支援工时100%保留
                 support_left_ratio = 1.0
             elif now_mins >= close_mins:
-                # 已经关店，支援工时归零
                 support_left_ratio = 0.0
             else:
-                # 处于支援时间段内，按时间流逝等比例扣减
                 support_left_ratio = (close_mins - now_mins) / total_support_duration_mins
             
-            # 剩余支援工时 = 总支援工时 * 剩余时间比例
             remaining_support_hours = support_hours_total * support_left_ratio
             remaining_hours += remaining_support_hours
             
@@ -328,16 +316,98 @@ if shared_data["is_active"]:
     
     accept_color = "#FF3B30" if can_accept < 0 else "#6200EE"
     accept_display = 0 if can_accept < 0 else can_accept
+
+    # ==========================================
+    # 🌟 新增核心逻辑：90分钟 SLA 微观预警系统 🌟
+    # ==========================================
+    target_tat_mins = 90
+    queue_qty = wait_qty + repairing_qty
+    # 清理当前队列所需的绝对工时
+    required_labor_hours_for_queue = queue_qty * (mins_per_device / 60.0)
+
+    # 设定未来 90 分钟的滑动时间窗口
+    t_start = now_mins
+    t_end = min(now_mins + target_tat_mins, close_mins)
+    window_duration = t_end - t_start
+
+    available_labor_hours_in_window = 0.0
+
+    if window_duration > 0:
+        # 1. 扫描常规排班在未来 90 分钟内的可用工时
+        for i in range(10, 23):
+            if i >= close_hour: continue
+            block_start = i * 60
+            block_end = int(min(i + 1, close_hour) * 60)
+            
+            # 计算当前小时块与 90 分钟窗口的重叠时间
+            overlap_start = max(t_start, block_start)
+            overlap_end = min(t_end, block_end)
+            overlap_mins = max(0, overlap_end - overlap_start)
+            
+            if overlap_mins > 0:
+                tech_count = calc_val(shared_data["hours"][i])
+                available_labor_hours_in_window += tech_count * (overlap_mins / 60.0)
+                
+        # 2. 扫描支援排班在未来 90 分钟内的可用工时
+        if support_hours_total > 0:
+            support_start_mins = int(support_start_time * 60)
+            total_support_duration_mins = close_mins - support_start_mins
+            
+            if total_support_duration_mins > 0:
+                # 算出支援技师的人数密度
+                support_tech_count = support_hours_total / (total_support_duration_mins / 60.0)
+                
+                overlap_start = max(t_start, support_start_mins)
+                overlap_end = min(t_end, close_mins)
+                overlap_mins = max(0, overlap_end - overlap_start)
+                
+                if overlap_mins > 0:
+                    available_labor_hours_in_window += support_tech_count * (overlap_mins / 60.0)
+
+    # 计算工时缺口
+    sla_shortfall_hours = required_labor_hours_for_queue - available_labor_hours_in_window
     
-    # 彻底消除 HTML 字符串中的缩进，防止触发 Markdown 代码块 Bug
+    # 构建 SLA 专属 UI 模块
+    if queue_qty == 0:
+        sla_html = f"""
+        <hr class="dashed">
+        <div class="pred-data-row">
+            <span>🎯 90分钟 SLA 状态：</span>
+            <span><span class="pred-highlight" style="color: #4CAF50 !important; font-size: 16px;">🟢 队列为空</span></span>
+        </div>
+        """
+    elif sla_shortfall_hours <= 0:
+        sla_html = f"""
+        <hr class="dashed">
+        <div class="pred-data-row">
+            <span>🎯 90分钟 SLA 状态：</span>
+            <span><span class="pred-highlight" style="color: #4CAF50 !important; font-size: 16px;">🟢 达标 (产能充足)</span></span>
+        </div>
+        <div class="pred-note" style="text-align: right; margin-top: 4px;">
+            未来 90 分钟可用工时: <strong>{available_labor_hours_in_window:.1f}h</strong> | 清理队列需: <strong>{required_labor_hours_for_queue:.1f}h</strong>
+        </div>
+        """
+    else:
+        sla_html = f"""
+        <hr class="dashed">
+        <div class="pred-data-row">
+            <span>🎯 90分钟 SLA 状态：</span>
+            <span><span class="pred-highlight" style="color: #FF3B30 !important; font-size: 16px;">🔴 超时预警</span></span>
+        </div>
+        <div class="pred-note" style="color: #FF3B30 !important; font-size: 13px; line-height: 1.6; text-align: right; margin-top: 4px;">
+            未来 90 分钟仅有 <strong>{available_labor_hours_in_window:.1f}h</strong> 工时，但清理队列需 <strong>{required_labor_hours_for_queue:.1f}h</strong><br>
+            ⚡️ 建议立即在接下来的 90 分钟内增加 <strong>{sla_shortfall_hours:.1f}</strong> 小时支援工时！
+        </div>
+        """
+    # ==========================================
+
     if can_accept < 0:
         excess_qty = abs(can_accept)
         extra_hours_needed = (excess_qty * mins_per_device) / 60.0
-        warning_html = f"<div class='pred-note' style='color: #FF3B30 !important; font-size: 13px; line-height: 1.6; text-align: right;'>⚠️ 警告：当前任务已超出剩余产能 <strong>{excess_qty}</strong> 台！<br>⏳ 预计还需 <strong>{extra_hours_needed:.1f}</strong> 小时才能清掉队列</div>"
+        warning_html = f"<div class='pred-note' style='color: #FF3B30 !important; font-size: 13px; line-height: 1.6; text-align: right;'>⚠️ 警告：当前任务已超出全天剩余总产能 <strong>{excess_qty}</strong> 台！<br>⏳ 预计还需 <strong>{extra_hours_needed:.1f}</strong> 小时才能清掉队列</div>"
     else:
         warning_html = f"<div class='pred-note' style='text-align: right;'>* 按单台耗时 {int(mins_per_device)} 分钟计算</div>"
 
-    # 如果有支援工时，显示剩余的支援工时和原始总工时
     if support_hours_total > 0:
         support_row_html = f"""<div class="pred-data-row" style="color: #4CAF50;">
 <span>➕ 包含剩余支援工时：</span>
@@ -346,13 +416,14 @@ if shared_data["is_active"]:
     else:
         support_row_html = ""
 
+    # 组装最终卡片
     card_html = f"""<div class="prediction-card">
 <div class="pred-title">
 <span>⏱️ 团队产能看板</span>
 <span style="font-size: 12px; color: #7E6BC4; font-weight: normal;">上次更新: {shared_data['updater_name']} @ {shared_data['update_time']}</span>
 </div>
 <div class="pred-data-row">
-<span>从 <strong>{start_time_str}</strong> 到 <strong>{end_time_str}</strong> 剩余工时：</span>
+<span>从 <strong>{start_time_str}</strong> 到 <strong>{end_time_str}</strong> 剩余总工时：</span>
 <span><span class="pred-highlight">{remaining_hours:.1f}</span> h</span>
 </div>
 {support_row_html}
@@ -368,6 +439,9 @@ if shared_data["is_active"]:
 <span>减去当前正在维修：</span>
 <span><span class="pred-highlight" style="color: #4CAF50 !important;">{repairing_qty}</span> 台</span>
 </div>
+
+{sla_html}
+
 <hr class="dashed">
 <div class="pred-data-row" style="font-size: 18px; font-weight: bold;">
 <span>✨ 还可以接入新单：</span>
@@ -416,9 +490,6 @@ function enhanceInputs() {
     const inputs = Array.from(doc.querySelectorAll('input:not([type="hidden"]), textarea'));
     
     inputs.forEach((input, index) => {
-        // --- 核心修改：iOS Safari 键盘真神方案 ---
-        // 保持 type="number"，但移除可能导致弹出纯九宫格的 inputmode 和 pattern
-        // 这样 iOS 就会弹出带有数字排的符号全键盘，并且完美支持 Next 键！
         if (input.getAttribute('type') === 'number') {
             input.removeAttribute('inputmode');
             input.removeAttribute('pattern');
@@ -438,7 +509,6 @@ function enhanceInputs() {
             input.setAttribute('placeholder', '请输入正在维修数量');
         }
         
-        // 设置键盘右下角的按钮为 Next 或 Done
         if (index < inputs.length - 1) {
             input.setAttribute('enterkeyhint', 'next');
         } else {
@@ -454,7 +524,6 @@ function enhanceInputs() {
             }
         }
         
-        // --- 体验优化：获得焦点时自动全选 ---
         if (!input.dataset.focusedAttached) {
             input.addEventListener('focus', function() {
                 setTimeout(() => this.select(), 50);
@@ -468,7 +537,6 @@ killBadge();
 setInterval(enhanceInputs, 500);
 doc.body.addEventListener('input', enhanceInputs);
 
-// 监听回车(Next)键，实现焦点自动跳跃
 doc.body.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') {
         if (e.target.tagName === 'INPUT') {
